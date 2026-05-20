@@ -749,6 +749,12 @@ input[type=file]{padding:6px;font-size:12px}
 }
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
+/* sync status colors */
+.sync-status.sync-ok{ color:#2D6A3A; font-weight:500; }
+.sync-status.sync-warn{ color:#B88808; font-weight:500; }
+.sync-status.sync-err{ color:#B22B1B; font-weight:500; }
+.sync-status.sync-busy{ color:var(--ink); font-weight:500; }
+
 /* ============== MOBILE & TABLET (≤980px) ============== */
 @media (max-width: 980px){
   /* App becomes single column; sidebar becomes a compact topbar */
@@ -1469,6 +1475,47 @@ input[type=file]{padding:6px;font-size:12px}
         </div>
 
         <div class="form-card">
+          <h3>Cloud sync <span style="font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:500;margin-left:6px">optional</span></h3>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:12px">
+            Sync your invoices, clients, and settings across devices. Requires deploying with the Cloudflare backend — see the deployment README.
+          </div>
+
+          <label class="toggle" style="margin-bottom:12px;display:inline-flex">
+            <input id="s-sync-enabled" type="checkbox" />
+            <span class="toggle-track"></span>
+            <span style="margin-left:8px;font-size:13px">Enable cloud sync</span>
+          </label>
+
+          <div id="syncFields">
+            <div class="form-row">
+              <label>Sync server URL</label>
+              <input id="s-sync-url" type="text" placeholder="/api/sync" />
+              <div style="font-size:11px;color:var(--muted);margin-top:3px">
+                Leave as <code style="font-family:var(--font-mono);background:var(--bg-input);padding:1px 5px;border-radius:3px;font-size:11px">/api/sync</code> when the HTML and worker are on the same Cloudflare project.
+              </div>
+            </div>
+
+            <div class="form-row" style="margin-top:11px">
+              <label>Sync key</label>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <input id="s-sync-key" type="text" placeholder="Generate or paste your sync key" style="flex:1;min-width:200px;font-family:var(--font-mono);font-size:12px" autocomplete="off" spellcheck="false" />
+                <button class="btn btn-sm" id="s-sync-gen" type="button">Generate</button>
+                <button class="btn btn-sm" id="s-sync-copy" type="button">Copy</button>
+              </div>
+              <div style="font-size:11px;color:var(--muted);margin-top:4px">
+                Save this key like a password. Use the same key on every device you want to sync. Anyone with this key can read or write your data.
+              </div>
+            </div>
+
+            <div style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--line);display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <span id="syncStatusText" class="sync-status" style="font-size:12px;color:var(--muted)">—</span>
+              <button class="btn btn-sm" id="s-sync-now" style="margin-left:auto" type="button">Sync now</button>
+              <button class="btn btn-sm btn-danger" id="s-sync-wipe" type="button">Wipe cloud copy</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-card">
           <h3>Data & backup</h3>
           <div style="font-size:12px;color:var(--muted);margin-bottom:10px">
             Your invoices, clients, and settings live in this browser only. Export a JSON backup to move them between devices or browsers.
@@ -1745,7 +1792,14 @@ const DEFAULTS = {
   },
   clients: [],
   documents: [],
-  currentId: null
+  currentId: null,
+  sync: {
+    enabled: false,
+    key: '',
+    url: '/api/sync',
+    lastSyncedAt: null
+  },
+  updatedAt: 0
 };
 
 function loadState(){
@@ -1759,17 +1813,174 @@ function loadState(){
       design: {...DEFAULTS.design, ...(p.design||{})},
       clients: p.clients || [],
       documents: p.documents || [],
-      currentId: p.currentId || null
+      currentId: p.currentId || null,
+      sync: {...DEFAULTS.sync, ...(p.sync||{})},
+      updatedAt: p.updatedAt || 0
     };
   } catch(e){ console.warn('load failed',e); return structuredClone(DEFAULTS); }
 }
-function saveState(){
+function saveLocal(){
   try { localStorage.setItem(LS_KEY, JSON.stringify(state)); }
   catch(e){ console.warn('save failed — possibly storage quota:', e); }
+}
+function saveState(){
+  state.updatedAt = Date.now();
+  saveLocal();
+  if (typeof cloudSync !== 'undefined') cloudSync.queuePush();
 }
 let state = loadState();
 let current = null;
 let dirty = false;
+
+// ============================================================
+// CLOUD SYNC  (Cloudflare Pages Function + KV)
+// ============================================================
+function relTime(ts){
+  if (!ts) return '';
+  const d = Date.now() - ts;
+  if (d < 5000) return 'just now';
+  if (d < 60000) return Math.floor(d/1000) + 's ago';
+  if (d < 3600000) return Math.floor(d/60000) + 'm ago';
+  if (d < 86400000) return Math.floor(d/3600000) + 'h ago';
+  return Math.floor(d/86400000) + 'd ago';
+}
+
+const cloudSync = {
+  pushTimer: null,
+  pushPending: false,
+  PUSH_DEBOUNCE_MS: 30000,
+
+  enabled(){ return !!(state.sync && state.sync.enabled && state.sync.key); },
+  url(){ return (state.sync && state.sync.url) || '/api/sync'; },
+  // The payload sent to the cloud: everything except `sync` (sync settings are per-device).
+  payload(){ const p = {...state}; delete p.sync; return p; },
+
+  async pull(){
+    const res = await fetch(this.url(), { headers: {'X-Sync-Key': state.sync.key} });
+    if (!res.ok){
+      const t = await res.text().catch(()=> '');
+      throw new Error('HTTP '+res.status+(t?': '+t.slice(0,120):''));
+    }
+    return await res.json();
+  },
+
+  async push(){
+    if (!this.enabled()) return;
+    if (!navigator.onLine){ this.pushPending = true; this.setStatus('offline'); return; }
+    this.setStatus('syncing');
+    try {
+      state.updatedAt = Date.now();
+      const res = await fetch(this.url(), {
+        method: 'PUT',
+        headers: {'Content-Type':'application/json','X-Sync-Key':state.sync.key},
+        body: JSON.stringify({ state: this.payload(), updatedAt: state.updatedAt })
+      });
+      if (!res.ok){
+        const t = await res.text().catch(()=> '');
+        throw new Error('HTTP '+res.status+(t?': '+t.slice(0,120):''));
+      }
+      this.pushPending = false;
+      state.sync.lastSyncedAt = Date.now();
+      saveLocal();
+      this.setStatus('synced');
+    } catch (e) {
+      this.pushPending = true;
+      this.setStatus('error', e.message);
+    }
+  },
+
+  queuePush(){
+    if (!this.enabled()) return;
+    this.pushPending = true;
+    clearTimeout(this.pushTimer);
+    this.pushTimer = setTimeout(()=> this.push(), this.PUSH_DEBOUNCE_MS);
+  },
+
+  async bootSync(){
+    if (!this.enabled()) return;
+    if (!navigator.onLine){ this.setStatus('offline'); return; }
+    this.setStatus('syncing');
+    try {
+      const remote = await this.pull();
+      if (!remote || !remote.state){
+        // Cloud is empty — push local
+        await this.push();
+        return;
+      }
+      const remoteTs = remote.updatedAt || (remote.state && remote.state.updatedAt) || 0;
+      const localTs = state.updatedAt || 0;
+      if (remoteTs > localTs){
+        // Cloud is newer — adopt it (but preserve local sync settings)
+        const localSync = {...state.sync};
+        state = {...remote.state, sync: localSync};
+        state.sync.lastSyncedAt = Date.now();
+        saveLocal();
+        applyDesign();
+        bootEditor();
+        updateCounts();
+        const activeView = document.querySelector('#tabsNav .tab.active')?.dataset.view;
+        if (activeView) setView(activeView);
+        this.setStatus('pulled');
+        toast('Pulled latest from cloud');
+      } else if (localTs > remoteTs){
+        // Local is newer — push
+        await this.push();
+      } else {
+        state.sync.lastSyncedAt = Date.now();
+        saveLocal();
+        this.setStatus('synced');
+      }
+    } catch (e) {
+      this.setStatus('error', e.message);
+    }
+  },
+
+  async wipeCloud(){
+    if (!this.enabled()) return;
+    const res = await fetch(this.url(), { method:'DELETE', headers:{'X-Sync-Key':state.sync.key} });
+    if (!res.ok){
+      const t = await res.text().catch(()=> '');
+      throw new Error('HTTP '+res.status+(t?': '+t.slice(0,120):''));
+    }
+    state.sync.lastSyncedAt = null;
+    saveLocal();
+    this.setStatus('disabled');
+  },
+
+  setStatus(kind, detail){
+    const el = document.getElementById('syncStatusText');
+    if (!el) return;
+    const ts = state.sync && state.sync.lastSyncedAt;
+    const ago = ts ? relTime(ts) : '';
+    let txt = '—', cls = '';
+    if (!this.enabled())               { txt = '○ Not enabled'; }
+    else if (kind === 'syncing')       { txt = '… Syncing'; cls = 'sync-busy'; }
+    else if (kind === 'synced')        { txt = '✓ Synced' + (ago ? ' · '+ago : ''); cls = 'sync-ok'; }
+    else if (kind === 'pulled')        { txt = '✓ Pulled from cloud · just now'; cls = 'sync-ok'; }
+    else if (kind === 'offline')       { txt = '○ Offline · saved locally'; cls = 'sync-warn'; }
+    else if (kind === 'error')         { txt = '⚠ ' + (detail || 'Sync error'); cls = 'sync-err'; }
+    else if (kind === 'disabled')      { txt = '○ Not enabled'; }
+    el.textContent = txt;
+    el.className = 'sync-status ' + cls;
+  }
+};
+
+window.addEventListener('online', () => {
+  if (cloudSync.enabled()){
+    if (cloudSync.pushPending) cloudSync.push();
+    else cloudSync.setStatus('synced');
+  }
+});
+window.addEventListener('offline', () => {
+  if (cloudSync.enabled()) cloudSync.setStatus('offline');
+});
+
+function generateSyncKey(){
+  const buf = new Uint8Array(16);
+  crypto.getRandomValues(buf);
+  const hex = Array.from(buf, b => b.toString(16).padStart(2, '0')).join('');
+  return hex.match(/.{8}/g).join('-');
+}
 
 const uid = ()=> Date.now().toString(36) + Math.random().toString(36).slice(2,7);
 const pad = (n,w=3)=> String(n).padStart(w,'0');
@@ -2718,6 +2929,21 @@ function fillSettingsForm(){
   g('s-email-body-quo').value = s.emailBodyQuo;
   g('s-email-sub-rem').value = s.emailSubRem;
   g('s-email-body-rem').value = s.emailBodyRem;
+
+  // Cloud sync fields
+  g('s-sync-enabled').checked = !!state.sync.enabled;
+  g('s-sync-url').value = state.sync.url || '/api/sync';
+  g('s-sync-key').value = state.sync.key || '';
+  toggleSyncFields();
+  cloudSync.setStatus(cloudSync.enabled() ? (state.sync.lastSyncedAt ? 'synced' : 'syncing') : 'disabled');
+}
+
+function toggleSyncFields(){
+  const on = document.getElementById('s-sync-enabled').checked;
+  const fields = document.getElementById('syncFields');
+  if (!fields) return;
+  fields.style.opacity = on ? '1' : '.45';
+  fields.style.pointerEvents = on ? 'auto' : 'none';
 }
 
 function fillDesignForm(){
@@ -2823,10 +3049,50 @@ document.getElementById('saveSettingsBtn').onclick = () => {
     emailSubRem: g('s-email-sub-rem').value,
     emailBodyRem: g('s-email-body-rem').value
   };
+  // Cloud sync settings
+  state.sync.enabled = g('s-sync-enabled').checked;
+  state.sync.url = (g('s-sync-url').value || '/api/sync').trim();
+  state.sync.key = g('s-sync-key').value.trim();
+
   saveState(); applyDesign(); if (current) updatePreview(); toast('Settings saved');
+
+  // If cloud sync is enabled and configured, try a sync immediately
+  if (cloudSync.enabled() && navigator.onLine){
+    cloudSync.bootSync().catch(e => console.warn('post-save sync:', e));
+  } else {
+    cloudSync.setStatus(cloudSync.enabled() ? 'syncing' : 'disabled');
+  }
 };
+
+// Cloud sync UI handlers
+document.getElementById('s-sync-enabled').onchange = () => {
+  toggleSyncFields();
+};
+document.getElementById('s-sync-gen').onclick = () => {
+  const existing = document.getElementById('s-sync-key').value;
+  if (existing && !confirm('Replace your existing sync key? You\'ll need to enter the new key on every other device.')) return;
+  const k = generateSyncKey();
+  document.getElementById('s-sync-key').value = k;
+};
+document.getElementById('s-sync-copy').onclick = async () => {
+  const v = document.getElementById('s-sync-key').value;
+  if (!v){ toast('Generate a key first'); return; }
+  try { await navigator.clipboard.writeText(v); toast('Key copied'); }
+  catch { document.getElementById('s-sync-key').select(); toast('Select & copy manually'); }
+};
+document.getElementById('s-sync-now').onclick = async () => {
+  // Persist whatever's in the form first
+  document.getElementById('saveSettingsBtn').click();
+};
+document.getElementById('s-sync-wipe').onclick = async () => {
+  if (!cloudSync.enabled()){ toast('Enable & save cloud sync first'); return; }
+  if (!confirm('Wipe the cloud copy of your data? Your local data on this device stays intact.')) return;
+  try { await cloudSync.wipeCloud(); toast('Cloud copy wiped'); }
+  catch (e) { toast('Failed: ' + (e.message || e)); }
+};
+
 document.getElementById('resetSettingsBtn').onclick = () => {
-  if (!confirm('Reset business details, prefixes, and defaults? (Your documents and clients stay.)')) return;
+  if (!confirm('Reset business details, prefixes, and defaults? (Your documents, clients, and sync key stay.)')) return;
   state.business = {...structuredClone(DEFAULTS.business), logo: state.business.logo};
   state.settings = structuredClone(DEFAULTS.settings);
   saveState(); fillSettingsForm(); toast('Reset');
@@ -2953,12 +3219,28 @@ updateCounts();
 bindForm();
 setView('editor');
 
-// Warn on close if unsaved
+// Cloud sync: pull on boot (background — won't block the UI)
+if (cloudSync.enabled() && navigator.onLine){
+  cloudSync.bootSync().catch(e => console.warn('boot sync:', e));
+}
+
+// Warn on close if unsaved + best-effort cloud flush
 window.addEventListener('beforeunload', e => {
   if (dirty){
     autosave();
     e.preventDefault();
     e.returnValue = '';
+  }
+  // Best-effort push to cloud before tab closes (keepalive: true allows the fetch to complete)
+  if (cloudSync.enabled() && cloudSync.pushPending && navigator.onLine){
+    try {
+      fetch(cloudSync.url(), {
+        method: 'PUT',
+        headers: {'Content-Type':'application/json','X-Sync-Key':state.sync.key},
+        body: JSON.stringify({ state: cloudSync.payload(), updatedAt: state.updatedAt || Date.now() }),
+        keepalive: true,
+      });
+    } catch(_){}
   }
 });
 
