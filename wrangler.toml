@@ -1,0 +1,30 @@
+# wrangler.toml — Cloudflare Pages configuration for InvoYou
+#
+# This file is OPTIONAL. You can do the entire deployment from the
+# Cloudflare dashboard without ever touching wrangler. This file is here
+# as a reference for those who prefer the wrangler CLI.
+
+name = "invoyou"
+compatibility_date = "2026-05-19"
+pages_build_output_dir = "."
+
+# ---------------------------------------------------------------
+# KV namespace binding for cloud sync.
+#
+# THE BINDING NAME `INVOYOU_KV` IS REQUIRED — the sync function
+# references it by that exact name.
+#
+# Two ways to set this binding:
+#
+# 1. Dashboard (recommended for non-developers):
+#    Pages project → Settings → Bindings → Add → KV namespace.
+#    Variable name: INVOYOU_KV
+#    Pick the KV namespace you created (e.g. "invoyou-data").
+#
+# 2. wrangler CLI: uncomment below, paste your namespace's ID,
+#    then run `wrangler pages deploy . --project-name invoyou`.
+# ---------------------------------------------------------------
+
+# [[kv_namespaces]]
+# binding = "INVOYOU_KV"
+# id = "paste-your-kv-namespace-id-here"
