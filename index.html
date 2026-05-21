@@ -138,10 +138,34 @@ input[type=file]{padding:6px;font-size:12px}
   margin-top:auto; padding-top:14px; border-top:1px solid var(--line);
   font-size:10.5px; color:var(--muted); font-family:var(--font-mono);
 }
+.sidebar-footer .sidebar-version{ margin-top:8px; }
 .sidebar-footer button{
   font-size:10.5px; text-decoration:underline; text-underline-offset:2px;
   color:var(--muted); font-family:inherit; display:block; margin-top:5px;
 }
+
+/* Support-the-project link buttons */
+.support-links{
+  display:flex; flex-direction:column; gap:6px; margin-bottom:8px;
+}
+.support-link{
+  display:flex; align-items:center; gap:8px;
+  padding:8px 10px; border-radius:6px;
+  font-family:var(--font-body); font-size:12px; font-weight:500;
+  text-decoration:none; transition:transform .12s, box-shadow .12s;
+  border:1px solid transparent;
+}
+.support-link:hover{ transform:translateY(-1px); }
+.support-link svg{ flex-shrink:0; }
+.support-link.bmac{ background:#FFDD00; color:#1F2937; border-color:#E6C400; }
+.support-link.bmac:hover{ box-shadow:0 4px 12px -4px rgba(255,221,0,.6); }
+.support-link.patreon{ background:#F96854; color:#fff; border-color:#E25A47; }
+.support-link.patreon:hover{ box-shadow:0 4px 12px -4px rgba(249,104,84,.5); }
+.support-link.generic{
+  background:var(--paper); color:var(--accent);
+  border-color:var(--accent); border-style:solid;
+}
+.support-link.generic:hover{ background:rgba(54,70,211,.08); }
 
 /* ===== MAIN ===== */
 .main{ padding:28px 36px 60px; max-width:1500px; }
@@ -854,8 +878,14 @@ input[type=file]{padding:6px;font-size:12px}
 
 /* ============== MOBILE & TABLET (≤980px) ============== */
 @media (max-width: 980px){
+  /* Prevent horizontal scroll caused by stray wide content */
+  html, body{ overflow-x:hidden; }
+
   /* App becomes single column; sidebar becomes a compact topbar */
   .app{ display:block; }
+
+  /* Inline max-width on view-content wrappers becomes full-width on mobile */
+  .view > div[style*="max-width"]{ max-width:100% !important; }
 
   .sidebar{
     position:sticky; top:0; height:auto; overflow:visible; z-index:30;
@@ -869,11 +899,12 @@ input[type=file]{padding:6px;font-size:12px}
   }
   .brand{
     grid-area:brand;
-    flex-direction:row; align-items:baseline;
+    flex-direction:row; align-items:baseline; flex-wrap:wrap;
     border-bottom:none; padding-bottom:0; gap:8px;
   }
   .brand-mark{ font-size:22px; }
   .brand-sub{ font-size:9px; }
+  .brand-tagline{ display:none; }
   .new-btn{
     grid-area:new; width:auto;
     padding:9px 14px; font-size:12.5px;
@@ -887,18 +918,45 @@ input[type=file]{padding:6px;font-size:12px}
   }
   #tabsNav::-webkit-scrollbar{ display:none; }
   .tab{
-    flex-shrink:0; padding:7px 12px; font-size:12.5px;
-    white-space:nowrap;
+    flex-shrink:0; padding:8px 13px; font-size:13px;
+    white-space:nowrap; min-height:36px;
   }
   .tab-icon{ display:none; }
   .tab-count{ display:none; }
 
-  /* Sidebar's Quick Actions + footer move to Settings → Data & backup card on mobile */
-  .sidebar > .sidebar-section,
+  /* Quick Actions sidebar section moves to Settings → Data & backup on mobile */
+  .sidebar > .sidebar-section{ display:none; }
+  /* Sidebar-footer is hidden on mobile by default; .has-support-links class reveals it */
   .sidebar-footer{ display:none; }
+  .sidebar.has-support-links{
+    grid-template-areas:
+      "brand new"
+      "tabs tabs"
+      "footer footer";
+  }
+  .sidebar.has-support-links .sidebar-footer{
+    grid-area:footer; grid-column:1 / -1;
+    margin-top:0; padding:8px 0 0; border-top:1px solid var(--line);
+    display:flex; align-items:center; gap:8px;
+    overflow-x:auto;
+    scrollbar-width:none;
+    font-family:var(--font-body);
+  }
+  .sidebar.has-support-links .sidebar-footer::-webkit-scrollbar{ display:none; }
+  /* Hide version + wipe button on mobile (they live in Settings → Data & backup) */
+  .sidebar-footer .sidebar-version,
+  .sidebar-footer > button{ display:none; }
+  /* Mobile support-links: horizontal, smaller */
+  .sidebar-footer .support-links{
+    flex-direction:row; gap:6px; margin-bottom:0; flex-wrap:nowrap;
+  }
+  .sidebar-footer .support-link{
+    padding:6px 10px; font-size:11.5px; flex-shrink:0; white-space:nowrap;
+  }
+  .sidebar-footer .support-link svg{ width:12px; height:12px; }
 
   /* Main pane */
-  .main{ padding:18px 14px 40px; }
+  .main{ padding:18px 14px 40px; max-width:100%; }
   .view-header{ margin-bottom:18px; gap:10px; align-items:flex-start; }
   .view-title{ font-size:32px; }
 
@@ -909,7 +967,7 @@ input[type=file]{padding:6px;font-size:12px}
 
 /* ============== PHONES (≤540px) ============== */
 @media (max-width: 540px){
-  .main{ padding:14px 12px 40px; }
+  .main{ padding:14px 12px 60px; }
   .view-title{ font-size:26px; }
   .view-sub{ font-size:12px; }
   .autosave-status{ font-size:10.5px; }
@@ -920,10 +978,21 @@ input[type=file]{padding:6px;font-size:12px}
   .form-card + .form-card{ margin-top:12px; }
   .form-card h3{ font-size:16px; }
 
-  input, select, textarea{ padding:10px 12px; font-size:14px; }
-  .btn{ padding:10px 14px; font-size:13px; }
-  .btn-sm{ padding:7px 11px; font-size:12px; }
-  .new-btn{ padding:10px 16px; font-size:13.5px; }
+  /* CRITICAL: 16px+ font on inputs prevents iOS Safari auto-zoom-on-focus */
+  input, select, textarea{
+    padding:11px 12px;
+    font-size:16px;
+    min-height:42px;
+  }
+  textarea{ min-height:80px; line-height:1.45; }
+  /* Tighten color inputs */
+  input[type=color]{ height:42px; padding:3px; }
+  /* Date inputs need extra room on mobile */
+  input[type=date]{ font-size:15px; }
+
+  .btn{ padding:11px 14px; font-size:14px; min-height:40px; }
+  .btn-sm{ padding:8px 11px; font-size:12.5px; min-height:34px; }
+  .new-btn{ padding:11px 16px; font-size:14px; }
 
   /* Line items become a compact 2-row card */
   .items-edit-head{ display:none; }
@@ -1132,7 +1201,7 @@ input[type=file]{padding:6px;font-size:12px}
   <aside class="sidebar">
     <div class="brand">
       <div class="brand-mark">Invo<em>You</em></div>
-      <div class="brand-sub">by Storitellah</div>
+      <div class="brand-sub">by <a href="http://storitellah.com" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;border-bottom:1px solid currentColor;padding-bottom:1px">Storitellah</a></div>
       <div class="brand-tagline">Simple invoicing for independent work.</div>
     </div>
 
@@ -1165,6 +1234,10 @@ input[type=file]{padding:6px;font-size:12px}
         <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="7" r="1.5" fill="currentColor"/><circle cx="17" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="17" r="1.5" fill="currentColor"/><circle cx="7" cy="12" r="1.5" fill="currentColor"/></svg>
         Look & Feel
       </button>
+      <button class="tab" data-view="dashboard" data-creator-only>
+        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-9 4 18 3-9h4"/></svg>
+        Dashboard
+      </button>
     </div>
 
     <div class="sidebar-section">
@@ -1186,7 +1259,10 @@ input[type=file]{padding:6px;font-size:12px}
     </div>
 
     <div class="sidebar-footer">
-      v2 · local-only
+      <div id="supportLinks" class="support-links" style="display:none"></div>
+      <div id="creatorBadge" style="display:none;font-size:10px;letter-spacing:.08em;color:var(--accent);font-weight:600;font-family:var(--font-body);margin-top:4px;text-transform:uppercase"></div>
+      <div id="creatorSignIn" style="display:none;margin-top:4px"></div>
+      <div class="sidebar-version">v2 · local-only</div>
       <button id="wipeBtn">Wipe all data</button>
     </div>
   </aside>
@@ -1277,7 +1353,7 @@ input[type=file]{padding:6px;font-size:12px}
             </div>
             <div class="form-row">
               <label>Website</label>
-              <input id="f-client-website" type="text" placeholder="propublica.org" />
+              <input id="f-client-website" type="text" placeholder="example.com" />
             </div>
             <div class="form-row">
               <label>Address</label>
@@ -1798,6 +1874,79 @@ input[type=file]{padding:6px;font-size:12px}
       </div>
     </section>
 
+    <!-- ----- DASHBOARD (creator-only configuration) ----- -->
+    <section id="view-dashboard" class="view" style="display:none" data-creator-only>
+      <header class="view-header">
+        <div>
+          <h1 class="view-title">Dash<em>board</em></h1>
+          <div class="view-sub">Support links for the InvoYou project — your visitors will see whichever links you fill in.</div>
+        </div>
+      </header>
+
+      <div style="max-width:780px">
+        <div class="form-card">
+          <h3>Support the project</h3>
+          <div style="font-size:12.5px;color:var(--muted);margin-bottom:14px;line-height:1.5">
+            Paste your full URLs below. Any link you leave blank simply won't appear. Buttons show up in the bottom-left of the sidebar (and at the top of the page on mobile).
+          </div>
+
+          <div class="form-row" style="margin-bottom:14px">
+            <label>
+              <span style="display:inline-flex;align-items:center;gap:8px">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 010 8h-1M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
+                Buy Me a Coffee
+              </span>
+            </label>
+            <input id="s-support-bmac" type="url" placeholder="https://buymeacoffee.com/your-handle" autocomplete="off" />
+          </div>
+
+          <div class="form-row" style="margin-bottom:14px">
+            <label>
+              <span style="display:inline-flex;align-items:center;gap:8px">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="14.5" cy="9.5" r="5.5"/><line x1="4" y1="3" x2="4" y2="22"/></svg>
+                Patreon
+              </span>
+            </label>
+            <input id="s-support-patreon" type="url" placeholder="https://patreon.com/your-handle" autocomplete="off" />
+          </div>
+
+          <div class="form-row" style="margin-bottom:14px">
+            <label>
+              <span style="display:inline-flex;align-items:center;gap:8px">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
+                Generic support link
+              </span>
+            </label>
+            <input id="s-support-generic" type="url" placeholder="https://your-donate-page.com  (PayPal, Ko-fi, GitHub Sponsors, etc.)" autocomplete="off" />
+            <div style="font-size:11px;color:var(--muted);margin-top:4px">Use this for any other support platform — the button label is configurable below.</div>
+          </div>
+
+          <div class="form-row" style="margin-bottom:14px">
+            <label>Generic-link button label</label>
+            <input id="s-support-generic-label" type="text" placeholder="Support the project" autocomplete="off" />
+          </div>
+
+          <div class="form-row" style="margin-bottom:14px">
+            <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:13px;color:var(--ink-soft);font-weight:500;cursor:pointer">
+              <input id="s-support-show" type="checkbox" style="width:auto;min-height:auto;margin:0" />
+              Show these buttons in the sidebar
+            </label>
+            <div style="font-size:11px;color:var(--muted);margin-top:4px;margin-left:24px">Uncheck to hide all support buttons even when links are filled in.</div>
+          </div>
+
+          <div style="margin-top:18px;display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-primary" id="saveSupportBtn">Save links</button>
+            <button class="btn" id="previewSupportBtn">Preview my buttons</button>
+          </div>
+
+          <div id="supportPreview" style="display:none;margin-top:16px;padding:16px;background:var(--bg-input);border:1px dashed var(--line);border-radius:var(--radius)">
+            <div style="font-size:11px;text-transform:uppercase;letter-spacing:.14em;color:var(--muted);margin-bottom:10px;font-weight:600">Sidebar preview</div>
+            <div id="supportPreviewLinks" class="support-links"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
   </main>
 </div>
 
@@ -1932,6 +2081,137 @@ const COLORS = {
 // STATE
 // ============================================================
 const LS_KEY = 'invoyou-storitellah-v2';
+
+// ============================================================
+// CREATOR / OWNER IDENTITY
+// ============================================================
+// Editing CREATOR_EMAILS lets you add or rotate creator accounts without code changes elsewhere.
+// The app considers someone "the creator" if:
+//   (a) Cloudflare Access has signed them in with one of these emails, OR
+//   (b) (development only) the email matches what's saved in this browser's localStorage.
+// Visitors who aren't the creator get a clean UI with the Dashboard tab hidden.
+// The Cloudflare Function ALSO enforces this server-side for Dashboard writes.
+const CREATOR_EMAILS = [
+  'bryanjaybee@gmail.com'
+];
+const CREATOR_LS_KEY = 'invoyou-creator-email';
+
+// Read the signed-in email injected by Cloudflare Access into a <meta> tag (see boot block at end).
+function getSignedInEmail(){
+  const meta = document.querySelector('meta[name="invoyou-user-email"]');
+  if (meta && meta.content) return meta.content.toLowerCase().trim();
+  // Dev fallback: localStorage value set by the "I am the creator" button on the welcome banner
+  const fallback = localStorage.getItem(CREATOR_LS_KEY);
+  return fallback ? fallback.toLowerCase().trim() : '';
+}
+function isCreator(){
+  const email = getSignedInEmail();
+  if (!email) return false;
+  return CREATOR_EMAILS.map(e => e.toLowerCase()).includes(email);
+}
+
+// Hide creator-only UI from visitors. Currently: just the Dashboard tab.
+// (Settings & Look & Feel stay open — visitors need them to use the app for their own work.)
+function applyCreatorVisibility(){
+  const creator = isCreator();
+  document.querySelectorAll('[data-creator-only]').forEach(el => {
+    el.style.display = creator ? '' : 'none';
+  });
+  // If a non-creator somehow lands on the dashboard view (e.g. browser back-button),
+  // redirect them to the editor.
+  if (!creator){
+    const cur = document.querySelector('#tabsNav .tab.active');
+    if (cur && cur.dataset.view === 'dashboard'){
+      setView('editor');
+    }
+  }
+  // Show the small "signed in as …" badge in the sidebar footer when a creator is signed in.
+  const badge = document.getElementById('creatorBadge');
+  if (badge){
+    if (creator){
+      badge.style.display = 'block';
+      badge.textContent = '★ Creator · ' + getSignedInEmail();
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+}
+
+// Ask the server who's signed in (via Cloudflare Access).
+// In selective-gating mode, /api/whoami is PUBLIC and returns null for non-creators;
+// the creator must have already completed a one-time auth handshake (triggered by
+// the "Sign in as creator" button) so their session cookie is set.
+async function fetchSignedInIdentity(){
+  try {
+    const res = await fetch('/api/whoami', { method: 'GET', headers: { 'Accept':'application/json' } });
+    if (!res.ok) return;                               // 404 on local file://, that's expected
+    const data = await res.json();
+    if (data && data.email){
+      // Inject as a meta tag so isCreator() picks it up everywhere consistently
+      let meta = document.querySelector('meta[name="invoyou-user-email"]');
+      if (!meta){
+        meta = document.createElement('meta');
+        meta.setAttribute('name', 'invoyou-user-email');
+        document.head.appendChild(meta);
+      }
+      meta.setAttribute('content', data.email);
+      applyCreatorVisibility();
+      renderSidebarSignIn();
+    } else {
+      // Anonymous visitor — show the discreet "Sign in as creator" link
+      renderSidebarSignIn();
+    }
+  } catch(_){
+    renderSidebarSignIn();
+  }
+}
+
+// Renders a small "Sign in as creator" link in the sidebar footer for anonymous visitors,
+// or "Sign out" for signed-in creators. Hidden entirely on file:// (no server).
+function renderSidebarSignIn(){
+  const el = document.getElementById('creatorSignIn');
+  if (!el) return;
+  // Only show this when running against a real server (skip on file://)
+  if (location.protocol === 'file:'){ el.style.display = 'none'; return; }
+  const creator = isCreator();
+  if (creator){
+    el.innerHTML = '<a href="/cdn-cgi/access/logout" style="color:var(--muted);text-decoration:underline;text-underline-offset:2px;font-size:10.5px;font-family:inherit">Sign out</a>';
+    el.style.display = 'block';
+  } else {
+    el.innerHTML = '<a href="#" id="creatorSignInLink" style="color:var(--muted);text-decoration:underline;text-underline-offset:2px;font-size:10.5px;font-family:inherit">Sign in as creator</a>';
+    el.style.display = 'block';
+    const link = document.getElementById('creatorSignInLink');
+    if (link){
+      link.onclick = (e) => {
+        e.preventDefault();
+        // Trigger Access auth by hitting a protected path. The browser handles the redirect
+        // to Google, then back to our page. After return, /api/whoami will recognize us.
+        // We open in the same window so the auth cookie is set on the right origin.
+        // Use a marker query param so the page knows to re-fetch identity after redirect-back.
+        const returnTo = location.origin + location.pathname + '?creator-signed-in=1';
+        location.href = '/cdn-cgi/access/login/' + encodeURIComponent(returnTo);
+      };
+    }
+  }
+}
+
+// If we just came back from creator sign-in, re-check identity once the page loads
+function handleCreatorSignInReturn(){
+  const params = new URLSearchParams(location.search);
+  if (params.get('creator-signed-in') === '1'){
+    // Clean the URL bar
+    history.replaceState({}, '', location.pathname);
+    // Refresh identity (the cookie is now set; /api/whoami should return our email)
+    fetchSignedInIdentity().then(() => {
+      if (isCreator()){
+        toast('Signed in as ' + getSignedInEmail());
+      } else {
+        toast('Sign-in didn\'t complete — try again');
+      }
+    });
+  }
+}
+
 const DEFAULTS = {
   business: {
     name: "My First Camera",
@@ -1985,6 +2265,13 @@ const DEFAULTS = {
     url: '/api/sync',
     lastSyncedAt: null
   },
+  support: {
+    show: true,
+    bmac: '',
+    patreon: '',
+    generic: '',
+    genericLabel: 'Support the project'
+  },
   updatedAt: 0
 };
 
@@ -2001,6 +2288,7 @@ function loadState(){
       documents: (p.documents || []).map(d => ({ clientPo: '', ...d })),
       currentId: p.currentId || null,
       sync: {...DEFAULTS.sync, ...(p.sync||{})},
+      support: {...DEFAULTS.support, ...(p.support||{})},
       updatedAt: p.updatedAt || 0
     };
   } catch(e){ console.warn('load failed',e); return structuredClone(DEFAULTS); }
@@ -2099,11 +2387,14 @@ const cloudSync = {
         // Cloud is newer — adopt it (but preserve local sync settings)
         const localSync = {...state.sync};
         state = {...remote.state, sync: localSync};
+        // Backfill support defaults if old payload didn't have them
+        state.support = {...DEFAULTS.support, ...(state.support||{})};
         state.sync.lastSyncedAt = Date.now();
         saveLocal();
         applyDesign();
         bootEditor();
         updateCounts();
+        renderSupportLinks();
         const activeView = document.querySelector('#tabsNav .tab.active')?.dataset.view;
         if (activeView) setView(activeView);
         this.setStatus('pulled');
@@ -3599,6 +3890,157 @@ document.getElementById('saveDesignBtn').onclick = () => {
   };
 });
 
+// ============================================================
+// DASHBOARD — creator-configurable support links
+// ============================================================
+// projectSupport lives in memory only on this client; it's fetched fresh from
+// /api/support on every load (so visitors always see the latest the creator set).
+// On a non-deployed environment (file://, etc.) it falls back to local state.support.
+let projectSupport = null;
+
+async function loadProjectSupport(){
+  try {
+    // Public read endpoint — Cloudflare Access doesn't gate this path
+    const res = await fetch('/api/support-public');
+    if (res.ok){
+      projectSupport = await res.json();
+      return;
+    }
+  } catch(_){ /* offline or no server */ }
+  // Fallback: legacy local state.support (back-compat with pre-server installs)
+  projectSupport = state.support || null;
+}
+
+function currentSupportConfig(){
+  return projectSupport || state.support || {};
+}
+
+function fillDashboardForm(){
+  const s = currentSupportConfig();
+  const g = id => document.getElementById(id);
+  g('s-support-bmac').value = s.bmac || '';
+  g('s-support-patreon').value = s.patreon || '';
+  g('s-support-generic').value = s.generic || '';
+  g('s-support-generic-label').value = s.genericLabel || 'Support the project';
+  g('s-support-show').checked = s.show !== false;
+  const preview = g('supportPreview');
+  if (preview) preview.style.display = 'none';
+}
+
+function buildSupportLinksHTML(){
+  const s = currentSupportConfig();
+  if (!s || !s.show) return '';
+  const links = [];
+  if (s.bmac && /^https?:\/\//i.test(s.bmac)){
+    links.push(`<a class="support-link bmac" href="${esc(s.bmac)}" target="_blank" rel="noopener">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 010 8h-1M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
+      <span>Buy me a coffee</span>
+    </a>`);
+  }
+  if (s.patreon && /^https?:\/\//i.test(s.patreon)){
+    links.push(`<a class="support-link patreon" href="${esc(s.patreon)}" target="_blank" rel="noopener">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="14.5" cy="9.5" r="5.5"/><line x1="4" y1="3" x2="4" y2="22"/></svg>
+      <span>Patreon</span>
+    </a>`);
+  }
+  if (s.generic && /^https?:\/\//i.test(s.generic)){
+    const label = (s.genericLabel || 'Support the project').trim() || 'Support the project';
+    links.push(`<a class="support-link generic" href="${esc(s.generic)}" target="_blank" rel="noopener">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
+      <span>${esc(label)}</span>
+    </a>`);
+  }
+  return links.join('');
+}
+
+function renderSupportLinks(){
+  const wrap = document.getElementById('supportLinks');
+  if (!wrap) return;
+  const html = buildSupportLinksHTML();
+  wrap.innerHTML = html;
+  const hasAny = html.length > 0;
+  wrap.style.display = hasAny ? 'flex' : 'none';
+  // Toggle the sidebar class so mobile reveal kicks in
+  const sidebar = document.querySelector('.sidebar');
+  if (sidebar) sidebar.classList.toggle('has-support-links', hasAny);
+}
+
+document.getElementById('saveSupportBtn').onclick = async () => {
+  if (!isCreator()){
+    toast('Only the project creator can save these.');
+    return;
+  }
+  const g = id => document.getElementById(id);
+  const cleanUrl = (s) => {
+    s = (s || '').trim();
+    if (!s) return '';
+    if (!/^https?:\/\//i.test(s)) s = 'https://' + s;
+    return s;
+  };
+  const payload = {
+    show: g('s-support-show').checked,
+    bmac: cleanUrl(g('s-support-bmac').value),
+    patreon: cleanUrl(g('s-support-patreon').value),
+    generic: cleanUrl(g('s-support-generic').value),
+    genericLabel: g('s-support-generic-label').value.trim() || 'Support the project'
+  };
+  // Save locally as fallback (and so file:// mode works)
+  state.support = payload;
+  saveState();
+  // Push to the server's creator-only endpoint
+  try {
+    const res = await fetch('/api/support', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok){
+      const err = await res.json().catch(() => ({error:'unknown'}));
+      toast('Server rejected: ' + (err.error || res.status));
+      return;
+    }
+    const data = await res.json();
+    if (data && data.config) projectSupport = data.config;
+    else projectSupport = payload;
+  } catch (e) {
+    // Offline / no server — local save still worked
+    projectSupport = payload;
+    toast('Saved locally (server unavailable)');
+  }
+  fillDashboardForm();
+  renderSupportLinks();
+  toast('Support links saved');
+};
+
+document.getElementById('previewSupportBtn').onclick = () => {
+  // Use form values directly (not yet saved) so creator can preview before saving
+  const g = id => document.getElementById(id);
+  const cleanUrl = (s) => {
+    s = (s || '').trim();
+    if (!s) return '';
+    if (!/^https?:\/\//i.test(s)) s = 'https://' + s;
+    return s;
+  };
+  const saved = projectSupport;
+  projectSupport = {
+    show: true,
+    bmac: cleanUrl(g('s-support-bmac').value),
+    patreon: cleanUrl(g('s-support-patreon').value),
+    generic: cleanUrl(g('s-support-generic').value),
+    genericLabel: g('s-support-generic-label').value.trim() || 'Support the project'
+  };
+  const html = buildSupportLinksHTML();
+  projectSupport = saved;    // restore current state
+  const previewBox = document.getElementById('supportPreview');
+  const previewLinks = document.getElementById('supportPreviewLinks');
+  if (!html){
+    previewLinks.innerHTML = '<div style="font-size:12px;color:var(--muted);font-style:italic">No valid links to show — paste at least one URL above.</div>';
+  } else {
+    previewLinks.innerHTML = html;
+  }
+  previewBox.style.display = 'block';
+};
+
 document.getElementById('saveSettingsBtn').onclick = () => {
   const g = id => document.getElementById(id);
   state.business = {
@@ -3728,9 +4170,10 @@ document.getElementById('importFile').onchange = e => {
         design: {...DEFAULTS.design, ...(p.design||{})},
         clients: p.clients || [],
         documents: p.documents || [],
-        currentId: p.currentId || null
+        currentId: p.currentId || null,
+        support: {...DEFAULTS.support, ...(p.support||{})}
       };
-      saveState(); bootEditor(); updateCounts(); applyDesign(); toast('Restored from backup');
+      saveState(); bootEditor(); updateCounts(); applyDesign(); renderSupportLinks(); toast('Restored from backup');
     } catch(err){ toast('Could not read file: ' + err.message); }
   };
   r.readAsText(file);
@@ -3741,13 +4184,18 @@ document.getElementById('wipeBtn').onclick = () => {
   if (!confirm('Really wipe everything?')) return;
   localStorage.removeItem(LS_KEY);
   state = loadState();
-  bootEditor(); updateCounts(); applyDesign(); toast('Wiped');
+  bootEditor(); updateCounts(); applyDesign(); renderSupportLinks(); toast('Wiped');
 };
 
 // ============================================================
 // VIEWS
 // ============================================================
 function setView(v){
+  // Block non-creators from the dashboard view, even via direct calls
+  if (v === 'dashboard' && !isCreator()){
+    toast('Dashboard is for the project creator only.');
+    v = 'editor';
+  }
   document.querySelectorAll('.view').forEach(el => el.style.display = 'none');
   document.getElementById('view-'+v).style.display = 'block';
   document.querySelectorAll('#tabsNav .tab').forEach(t => t.classList.toggle('active', t.dataset.view === v));
@@ -3756,6 +4204,7 @@ function setView(v){
   if (v === 'insights') renderInsights();
   if (v === 'settings') fillSettingsForm();
   if (v === 'design') fillDesignForm();
+  if (v === 'dashboard') fillDashboardForm();
 }
 document.querySelectorAll('#tabsNav .tab').forEach(t => { t.onclick = () => setView(t.dataset.view); });
 
@@ -3806,6 +4255,20 @@ bootEditor();
 updateCounts();
 bindForm();
 setView('editor');
+renderSupportLinks();
+applyCreatorVisibility();
+renderSidebarSignIn();
+
+// Try to discover the signed-in user from Cloudflare Access (if deployed there).
+// This is a no-op if /api/whoami doesn't exist (local file:// or non-Cloudflare host).
+fetchSignedInIdentity();
+
+// If we just came back from a creator sign-in handshake, refresh and toast
+handleCreatorSignInReturn();
+
+// Load the creator's published support links from /api/support (public read).
+// Falls back gracefully if the endpoint isn't available (local file://).
+loadProjectSupport().then(() => renderSupportLinks());
 
 // Cloud sync: pull on boot (background — won't block the UI)
 if (cloudSync.enabled() && navigator.onLine){

@@ -12,6 +12,8 @@ A clean, single-file invoicing app for freelancers. Create professional invoices
 
 **Track.** History view with status pills (Draft / Sent / Paid / Overdue / Accepted), client list with autocomplete, and an Insights dashboard with stat cards, a status donut, monthly revenue bars, and a calendar of issued/paid/due/overdue dates.
 
+**Customise.** A creator-only **Dashboard** tab lets the project owner (set in `functions/api/support.js` → `CREATOR_EMAILS`) publish Buy Me a Coffee, Patreon, and/or generic support URLs. Visitors see the resulting buttons in the sidebar but can't edit them — the Dashboard tab is hidden from non-creator sessions, and the server endpoint rejects writes from anyone else.
+
 **Keep.** Autosaves to your browser every 1.5 seconds. Optional cross-device sync via Cloudflare KV (one sync key, last-write-wins). Optional sign-in via Cloudflare Access (Google login).
 
 **Export.** Print to PDF from your browser. Download Insights snapshots as PDF. Email a billing snapshot to yourself. Full JSON backup and restore.
@@ -121,6 +123,51 @@ Done. Open your URL — you'll be redirected to Google's login, sign in with the
 - **Offline.** Local autosave (localStorage) always works. Cloud push is queued and retries when you're back online.
 - **Per-device.** Your sync key, sync URL, and last-sync time are never pushed — they stay per device.
 
+## Creator-only Dashboard (you vs your visitors)
+
+InvoYou separates **the project creator** (you) from **visitors** (everyone else using your deployment). The creator gets a **Dashboard** tab where you can publish support links — Buy Me a Coffee, Patreon, and a generic third option. Those links appear in the sidebar for every visitor. The Dashboard form itself is hidden from visitors, and the API endpoint rejects writes from anyone who isn't a creator.
+
+### How the creator check works
+
+Two layers, both checking the same thing:
+
+1. **UI layer (client-side).** The Dashboard tab carries a `data-creator-only` attribute. On every page load the app calls `/api/whoami`, which returns the email Cloudflare Access signed in with. If that email is in the `CREATOR_EMAILS` list (in `functions/api/support.js`), the Dashboard tab is shown; otherwise it's hidden. This is just UX cleanliness — anyone in DevTools can flip a CSS flag.
+
+2. **Server layer (the one that actually matters).** When you save support links from the Dashboard, the app PUTs to `/api/support`. The Pages Function reads Cloudflare Access's `Cf-Access-Authenticated-User-Email` header (which is signed and trustworthy — set by Cloudflare's edge, not by the browser). If the email isn't in `CREATOR_EMAILS`, the write is rejected with HTTP 403. So even a determined visitor who bypasses the UI can't actually save anything.
+
+### Setting yourself as the creator
+
+The list of creator emails lives in **`functions/api/support.js`**:
+
+```js
+const CREATOR_EMAILS = [
+  'bryanjaybee@gmail.com'    // edit me
+];
+```
+
+To add or rotate creators, edit that array and redeploy (`git push`). No environment variables, no admin UI — keeping it in code makes accidental misconfiguration impossible.
+
+### What this requires
+
+For the server check to work, you **must** enable **Cloudflare Access with Google login** (covered in step 4 above). Without Access, the `Cf-Access-Authenticated-User-Email` header is never set, no one can be a creator, and the Dashboard is permanently hidden. (Visitors still see published support links — those just live as static data once you've saved them.)
+
+If you don't deploy with Cloudflare Access, the app falls back to local-only mode: support links can still be saved per-browser (to localStorage), but they're personal to that browser, not published globally.
+
+### What happens to visitors
+
+Visitors who open your `*.pages.dev` URL:
+- See your branding (logo, "by Storitellah" link, support buttons)
+- Get their own private localStorage (their drafts, clients, settings are theirs)
+- Can configure their own Settings (business info, currency, prefixes) — they need to, to use the app
+- **Don't** see the Dashboard tab
+- **Can't** modify your published support links, even by poking at the API
+
+### What's per-visitor vs project-wide
+
+- **Per-visitor (their localStorage):** business info, clients, documents, design preferences, sync settings
+- **Project-wide (creator-managed):** the support links shown in the sidebar
+- **In the code (git-managed):** the creator email list, the brand defaults, the page structure
+
 ## Free-tier limits (Cloudflare, as of 2026)
 
 - **Pages:** unlimited bandwidth, unlimited requests to static files.
@@ -157,6 +204,12 @@ Pages project → **Custom domains → Set up a custom domain**. Cloudflare hand
 
 **Cloudflare Access redirect loop**
 → Your Google OAuth credentials in step 4b are misconfigured. Re-run that wizard, double-check the redirect URI matches what Cloudflare shows.
+
+**Dashboard tab doesn't show up even though I'm signed in**
+→ Three things to check. (1) Cloudflare Access is enabled and you signed in with the email that's listed in `CREATOR_EMAILS` (case doesn't matter, but spelling does). (2) The deployment is current — if you added your email after deploying, push again. (3) Visit `/api/whoami` in your browser directly — it should show `{"email":"your@email.com","authenticated":true}`. If it shows `{"email":null,"authenticated":false}`, Access isn't passing the header; check that the Access application's domain in step 4c matches the URL you're actually using.
+
+**"Forbidden" when saving support links**
+→ Your signed-in email isn't in `CREATOR_EMAILS` in `functions/api/support.js`. Edit, commit, push.
 
 **I lost my sync key**
 → Local data on every device is safe. Generate a new key, save it on every device, then **Wipe cloud copy** in Settings to clear the old data.

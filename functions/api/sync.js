@@ -1,12 +1,13 @@
 // InvoYou cloud-sync API — Cloudflare Pages Function
 // Routes:
-//   GET    /api/sync   → return the saved state blob for the sync key (or {state:null} if empty)
+//   GET    /api/sync   → return the saved state blob for the sync key
 //   PUT    /api/sync   → save the state blob keyed by the sync key
 //   DELETE /api/sync   → remove the cloud copy
 //
 // Auth: a single header `X-Sync-Key` containing the user's sync key.
-// The KV namespace must be bound as `INVOYOU_KV` in the Pages project's
-// Settings → Bindings.
+//
+// Note: per-user sync state is independent of creator-only project settings.
+// Creator-only data (support links) lives at /api/support, not here.
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -23,7 +24,7 @@ function json(body, status = 200) {
   });
 }
 
-const MAX_PAYLOAD_BYTES = 5 * 1024 * 1024; // 5MB — well under KV's 25MB cap
+const MAX_PAYLOAD_BYTES = 5 * 1024 * 1024;
 
 export async function onRequest(context) {
   const { request, env } = context;
@@ -38,7 +39,6 @@ export async function onRequest(context) {
     }, 500);
   }
 
-  // Auth: simple shared-secret header. Anyone with the key can read/write the user's blob.
   const key = request.headers.get('X-Sync-Key');
   if (!key)                                     return json({ error: 'Missing X-Sync-Key header' }, 401);
   if (key.length < 16 || key.length > 200)      return json({ error: 'Sync key must be 16-200 characters' }, 400);
@@ -50,7 +50,6 @@ export async function onRequest(context) {
     if (request.method === 'GET') {
       const data = await env.INVOYOU_KV.get(storageKey);
       if (!data) return json({ state: null, updatedAt: null });
-      // Pass through stored JSON verbatim, with CORS headers
       return new Response(data, { headers: { ...JSON_TYPE, ...CORS } });
     }
 
@@ -59,7 +58,6 @@ export async function onRequest(context) {
       if (body.length > MAX_PAYLOAD_BYTES) {
         return json({ error: 'Payload too large (limit 5MB)' }, 413);
       }
-      // Validate it's JSON shaped like {state, updatedAt}
       let parsed;
       try { parsed = JSON.parse(body); }
       catch { return json({ error: 'Body must be JSON' }, 400); }
