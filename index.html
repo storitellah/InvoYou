@@ -913,18 +913,34 @@ input[type=file]{padding:6px;font-size:12px}
   }
   #tabsNav{
     grid-area:tabs;
+    display:flex;             /* re-assert (overrides .tabs flex-direction:column inheritance) */
     flex-direction:row;
     overflow-x:auto; -webkit-overflow-scrolling:touch;
     scrollbar-width:none;
-    margin:0 -14px; padding:0 14px 2px;
+    margin:0 -14px;
+    padding:0 14px 4px;
+    /* Right-edge gradient fade hints there's more to scroll */
+    mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 24px), transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 24px), transparent 100%);
   }
   #tabsNav::-webkit-scrollbar{ display:none; }
-  .tab{
-    flex-shrink:0; padding:8px 13px; font-size:13px;
-    white-space:nowrap; min-height:36px;
+  #tabsNav .tab{
+    /* CRITICAL: override .tab base width:100% — desktop wants vertical full-width
+       tabs, mobile wants horizontal auto-width tabs that fit their text */
+    width:auto;
+    flex:0 0 auto;
+    padding:8px 14px;
+    font-size:13px;
+    white-space:nowrap;
+    min-height:36px;
+    display:flex;
+    align-items:center;
+    gap:8px;
   }
-  .tab-icon{ display:none; }
-  .tab-count{ display:none; }
+  /* Re-display tab icons on mobile — they take little space and make tabs scannable */
+  #tabsNav .tab .tab-icon{ display:inline-block; width:14px; height:14px; }
+  /* Hide tab-count pill (just clutter on cramped mobile tabs) */
+  #tabsNav .tab .tab-count{ display:none; }
 
   /* Hide Quick Actions sidebar section on mobile (lives in Settings → Data & backup instead).
      But KEEP the Support section visible — that's #supportSection, identified by its id. */
@@ -4234,6 +4250,17 @@ function setView(v){
   if (v === 'settings') fillSettingsForm();
   if (v === 'design') fillDesignForm();
   if (v === 'dashboard') fillDashboardForm();
+  // Scroll the active tab into view on mobile (horizontally-scrolling tab strip)
+  requestAnimationFrame(() => {
+    const activeTab = document.querySelector('#tabsNav .tab.active');
+    if (activeTab && typeof activeTab.scrollIntoView === 'function'){
+      activeTab.scrollIntoView({ behavior:'smooth', block:'nearest', inline:'center' });
+    }
+    // Also scroll page to top so user sees the new view from its header
+    if (window.innerWidth <= 980){
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  });
 }
 document.querySelectorAll('#tabsNav .tab').forEach(t => { t.onclick = () => setView(t.dataset.view); });
 
