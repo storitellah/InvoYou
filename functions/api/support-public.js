@@ -16,10 +16,14 @@ const JSON_TYPE = { 'Content-Type': 'application/json' };
 
 const STORAGE_KEY = 'creator:support';
 
+// These defaults are returned when the creator hasn't yet saved a config via /api/support.
+// Edit them in this file AND redeploy if you want different starting links.
+// (Once the creator saves through the Dashboard, these are overridden.)
 const DEFAULTS = {
-  show: false,
+  show: true,
   bmac: '',
-  patreon: '',
+  kofi: 'https://ko-fi.com/P5P41FCK5',
+  patreon: 'https://www.patreon.com/c/kiberastories',
   generic: '',
   genericLabel: 'Support the project'
 };

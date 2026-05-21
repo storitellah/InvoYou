@@ -146,21 +146,23 @@ input[type=file]{padding:6px;font-size:12px}
 
 /* Support-the-project link buttons */
 .support-links{
-  display:flex; flex-direction:column; gap:6px; margin-bottom:8px;
+  display:flex; flex-direction:column; gap:6px;
 }
 .support-link{
   display:flex; align-items:center; gap:8px;
   padding:8px 10px; border-radius:6px;
-  font-family:var(--font-body); font-size:12px; font-weight:500;
+  font-family:var(--font-body); font-size:12px; font-weight:600;
   text-decoration:none; transition:transform .12s, box-shadow .12s;
-  border:1px solid transparent;
+  border:1px solid transparent; line-height:1.2;
 }
 .support-link:hover{ transform:translateY(-1px); }
 .support-link svg{ flex-shrink:0; }
+.support-link.kofi{ background:#FF5E5B; color:#fff; border-color:#E54744; }
+.support-link.kofi:hover{ box-shadow:0 4px 12px -4px rgba(255,94,91,.5); }
 .support-link.bmac{ background:#FFDD00; color:#1F2937; border-color:#E6C400; }
 .support-link.bmac:hover{ box-shadow:0 4px 12px -4px rgba(255,221,0,.6); }
-.support-link.patreon{ background:#F96854; color:#fff; border-color:#E25A47; }
-.support-link.patreon:hover{ box-shadow:0 4px 12px -4px rgba(249,104,84,.5); }
+.support-link.patreon{ background:#000; color:#fff; border-color:#000; }
+.support-link.patreon:hover{ box-shadow:0 4px 12px -4px rgba(0,0,0,.4); }
 .support-link.generic{
   background:var(--paper); color:var(--accent);
   border-color:var(--accent); border-style:solid;
@@ -924,36 +926,38 @@ input[type=file]{padding:6px;font-size:12px}
   .tab-icon{ display:none; }
   .tab-count{ display:none; }
 
-  /* Quick Actions sidebar section moves to Settings → Data & backup on mobile */
-  .sidebar > .sidebar-section{ display:none; }
-  /* Sidebar-footer is hidden on mobile by default; .has-support-links class reveals it */
+  /* Hide Quick Actions sidebar section on mobile (lives in Settings → Data & backup instead).
+     But KEEP the Support section visible — that's #supportSection, identified by its id. */
+  .sidebar > .sidebar-section:not(#supportSection){ display:none; }
+  /* Sidebar-footer (version + wipe + sign-in link) hidden on mobile */
   .sidebar-footer{ display:none; }
+
+  /* Reveal Support section as a slim strip below tabs when it has content */
   .sidebar.has-support-links{
     grid-template-areas:
       "brand new"
       "tabs tabs"
-      "footer footer";
+      "support support";
   }
-  .sidebar.has-support-links .sidebar-footer{
-    grid-area:footer; grid-column:1 / -1;
+  .sidebar.has-support-links #supportSection{
+    grid-area:support; grid-column:1 / -1;
     margin-top:0; padding:8px 0 0; border-top:1px solid var(--line);
     display:flex; align-items:center; gap:8px;
     overflow-x:auto;
     scrollbar-width:none;
     font-family:var(--font-body);
   }
-  .sidebar.has-support-links .sidebar-footer::-webkit-scrollbar{ display:none; }
-  /* Hide version + wipe button on mobile (they live in Settings → Data & backup) */
-  .sidebar-footer .sidebar-version,
-  .sidebar-footer > button{ display:none; }
+  .sidebar.has-support-links #supportSection::-webkit-scrollbar{ display:none; }
+  /* Hide the "Support the project" heading on mobile — buttons speak for themselves */
+  .sidebar.has-support-links #supportSection h4{ display:none; }
   /* Mobile support-links: horizontal, smaller */
-  .sidebar-footer .support-links{
-    flex-direction:row; gap:6px; margin-bottom:0; flex-wrap:nowrap;
+  #supportSection .support-links{
+    flex-direction:row; gap:6px; flex-wrap:nowrap;
   }
-  .sidebar-footer .support-link{
+  #supportSection .support-link{
     padding:6px 10px; font-size:11.5px; flex-shrink:0; white-space:nowrap;
   }
-  .sidebar-footer .support-link svg{ width:12px; height:12px; }
+  #supportSection .support-link svg{ width:12px; height:12px; }
 
   /* Main pane */
   .main{ padding:18px 14px 40px; max-width:100%; }
@@ -1258,8 +1262,12 @@ input[type=file]{padding:6px;font-size:12px}
       </div>
     </div>
 
+    <div class="sidebar-section" id="supportSection" style="display:none">
+      <h4>Support the project</h4>
+      <div id="supportLinks" class="support-links"></div>
+    </div>
+
     <div class="sidebar-footer">
-      <div id="supportLinks" class="support-links" style="display:none"></div>
       <div id="creatorBadge" style="display:none;font-size:10px;letter-spacing:.08em;color:var(--accent);font-weight:600;font-family:var(--font-body);margin-top:4px;text-transform:uppercase"></div>
       <div id="creatorSignIn" style="display:none;margin-top:4px"></div>
       <div class="sidebar-version">v2 · local-only</div>
@@ -1903,6 +1911,16 @@ input[type=file]{padding:6px;font-size:12px}
           <div class="form-row" style="margin-bottom:14px">
             <label>
               <span style="display:inline-flex;align-items:center;gap:8px">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l-1 5a4 4 0 01-4 3h-2a4 4 0 01-4-3l-1-5z"/><path d="M9 14v6M15 14v6M7 22h10"/></svg>
+                Ko-fi
+              </span>
+            </label>
+            <input id="s-support-kofi" type="url" placeholder="https://ko-fi.com/your-handle" autocomplete="off" />
+          </div>
+
+          <div class="form-row" style="margin-bottom:14px">
+            <label>
+              <span style="display:inline-flex;align-items:center;gap:8px">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="14.5" cy="9.5" r="5.5"/><line x1="4" y1="3" x2="4" y2="22"/></svg>
                 Patreon
               </span>
@@ -2268,7 +2286,8 @@ const DEFAULTS = {
   support: {
     show: true,
     bmac: '',
-    patreon: '',
+    kofi: 'https://ko-fi.com/P5P41FCK5',
+    patreon: 'https://www.patreon.com/c/kiberastories',
     generic: '',
     genericLabel: 'Support the project'
   },
@@ -3919,6 +3938,7 @@ function fillDashboardForm(){
   const s = currentSupportConfig();
   const g = id => document.getElementById(id);
   g('s-support-bmac').value = s.bmac || '';
+  g('s-support-kofi').value = s.kofi || '';
   g('s-support-patreon').value = s.patreon || '';
   g('s-support-generic').value = s.generic || '';
   g('s-support-generic-label').value = s.genericLabel || 'Support the project';
@@ -3937,9 +3957,15 @@ function buildSupportLinksHTML(){
       <span>Buy me a coffee</span>
     </a>`);
   }
+  if (s.kofi && /^https?:\/\//i.test(s.kofi)){
+    links.push(`<a class="support-link kofi" href="${esc(s.kofi)}" target="_blank" rel="noopener" aria-label="Support on Ko-fi">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l-1 5a4 4 0 01-4 3h-2a4 4 0 01-4-3l-1-5z"/><path d="M9 14v6M15 14v6M7 22h10"/></svg>
+      <span>Ko-fi</span>
+    </a>`);
+  }
   if (s.patreon && /^https?:\/\//i.test(s.patreon)){
-    links.push(`<a class="support-link patreon" href="${esc(s.patreon)}" target="_blank" rel="noopener">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="14.5" cy="9.5" r="5.5"/><line x1="4" y1="3" x2="4" y2="22"/></svg>
+    links.push(`<a class="support-link patreon" href="${esc(s.patreon)}" target="_blank" rel="noopener" aria-label="Support on Patreon">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="15" cy="9" r="6"/><rect x="2" y="3" width="3" height="18"/></svg>
       <span>Patreon</span>
     </a>`);
   }
@@ -3955,11 +3981,12 @@ function buildSupportLinksHTML(){
 
 function renderSupportLinks(){
   const wrap = document.getElementById('supportLinks');
-  if (!wrap) return;
+  const section = document.getElementById('supportSection');
+  if (!wrap || !section) return;
   const html = buildSupportLinksHTML();
   wrap.innerHTML = html;
   const hasAny = html.length > 0;
-  wrap.style.display = hasAny ? 'flex' : 'none';
+  section.style.display = hasAny ? 'block' : 'none';
   // Toggle the sidebar class so mobile reveal kicks in
   const sidebar = document.querySelector('.sidebar');
   if (sidebar) sidebar.classList.toggle('has-support-links', hasAny);
@@ -3980,6 +4007,7 @@ document.getElementById('saveSupportBtn').onclick = async () => {
   const payload = {
     show: g('s-support-show').checked,
     bmac: cleanUrl(g('s-support-bmac').value),
+    kofi: cleanUrl(g('s-support-kofi').value),
     patreon: cleanUrl(g('s-support-patreon').value),
     generic: cleanUrl(g('s-support-generic').value),
     genericLabel: g('s-support-generic-label').value.trim() || 'Support the project'
@@ -4025,6 +4053,7 @@ document.getElementById('previewSupportBtn').onclick = () => {
   projectSupport = {
     show: true,
     bmac: cleanUrl(g('s-support-bmac').value),
+    kofi: cleanUrl(g('s-support-kofi').value),
     patreon: cleanUrl(g('s-support-patreon').value),
     generic: cleanUrl(g('s-support-generic').value),
     genericLabel: g('s-support-generic-label').value.trim() || 'Support the project'

@@ -89,6 +89,7 @@ export async function onRequest(context) {
     const clean = {
       show: parsed.show === true,
       bmac: sanitizeUrl(parsed.bmac),
+      kofi: sanitizeUrl(parsed.kofi),
       patreon: sanitizeUrl(parsed.patreon),
       generic: sanitizeUrl(parsed.generic),
       genericLabel: String(parsed.genericLabel || 'Support the project').trim().slice(0, 80) || 'Support the project'
