@@ -23,15 +23,40 @@ A clean, single-file invoicing app for freelancers. Create professional invoices
 ```
 .
 ├── index.html                   ← The whole app, one file. Everything runs in the browser.
+├── manifest.json                ← PWA manifest — makes the app installable to home screen
+├── sw.js                        ← Service worker — caches app shell, works offline
+├── icons/                       ← App icons for Android, iOS, favicons
+│   ├── icon-192.png
+│   ├── icon-512.png
+│   ├── icon-maskable-192.png    ← For Android adaptive icons (round/squircle masks)
+│   ├── icon-maskable-512.png
+│   ├── apple-touch-icon.png     ← iOS home-screen icon
+│   ├── favicon-32.png
+│   └── favicon-64.png
 ├── functions/
 │   └── api/
-│       └── sync.js              ← Cloudflare Pages Function for optional cloud sync
+│       ├── sync.js              ← Per-user cloud sync (optional)
+│       ├── whoami.js            ← Returns Cloudflare Access identity
+│       ├── support.js           ← Creator-only support-links write endpoint
+│       └── support-public.js    ← Public support-links read endpoint
 ├── wrangler.toml                ← Optional Cloudflare CLI config
 ├── .gitignore
 └── README.md                    ← This file
 ```
 
-The HTML file works completely on its own (open it in any browser, your data lives in localStorage). The `functions/` folder only matters if you want cross-device sync.
+The HTML file works completely on its own (open it in any browser, your data lives in localStorage). The `functions/` folder only matters if you want cross-device sync or creator-only Dashboard. The `manifest.json`, `sw.js`, and `icons/` make the app installable as a Progressive Web App on phones and desktops.
+
+## Install as a phone app (PWA)
+
+InvoYou is a Progressive Web App, so it installs to a phone's home screen and runs full-screen with its own icon, no browser chrome — visually indistinguishable from a "real" app, without going through Google Play or the App Store.
+
+**On Android (Chrome / Edge / Brave):** Open `invoyou.com`, look for an "Install app" link in the sidebar footer, or use the browser menu → Install. The app gets an icon on your home screen and a launcher entry. Long-press the icon for shortcuts to "New invoice", "New quotation", or "History".
+
+**On iPhone (Safari):** Open `invoyou.com`, tap the Share button → "Add to Home Screen". iOS doesn't auto-prompt the way Chrome does, but the installed app behaves the same way once it's there.
+
+**On desktop (Chrome / Edge):** An install icon appears in the address bar. The app opens in its own window without browser tabs.
+
+After install, the app works offline for everything except cross-device sync — your invoices, clients, and design preferences are all saved locally and load instantly even with no network.
 
 ## Quick start — local
 

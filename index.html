@@ -4,6 +4,19 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>InvoYou by Storitellah</title>
+
+<!-- PWA: manifest, theme colors, icons -->
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#3646D3">
+<meta name="description" content="Simple invoicing for independent work — invoices, quotations, clients, all in one place.">
+<link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="64x64" href="/icons/favicon-64.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="InvoYou">
+<meta name="mobile-web-app-capable" content="yes">
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300..800&family=Inter:wght@300..700&family=Fraunces:opsz,wght,SOFT@9..144,300..700,0..100&family=Playfair+Display:ital,wght@0,400..800;1,400..800&family=Cormorant+Garamond:ital,wght@0,400..700;1,400..700&family=Work+Sans:wght@300..700&family=EB+Garamond:ital,wght@0,400..700;1,400..700&family=Lato:wght@300..700&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Source+Sans+3:wght@300..700&family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300..700&family=Spectral:ital,wght@0,300..700;1,300..700&family=IBM+Plex+Sans:wght@300..600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -1286,6 +1299,12 @@ input[type=file]{padding:6px;font-size:12px}
     <div class="sidebar-footer">
       <div id="creatorBadge" style="display:none;font-size:10px;letter-spacing:.08em;color:var(--accent);font-weight:600;font-family:var(--font-body);margin-top:4px;text-transform:uppercase"></div>
       <div id="creatorSignIn" style="display:none;margin-top:4px"></div>
+      <div id="installApp" style="display:none;margin-top:4px">
+        <a href="#" id="installAppLink" style="color:var(--accent);text-decoration:none;font-size:10.5px;font-family:inherit;display:inline-flex;align-items:center;gap:4px;font-weight:600">
+          <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v9M5 8l3 3 3-3M2 14h12"/></svg>
+          Install app
+        </a>
+      </div>
       <div class="sidebar-version">v2 · local-only</div>
       <button id="wipeBtn">Wipe all data</button>
     </div>
@@ -4365,6 +4384,96 @@ if (!state.business.email && !state.documents.length && !state.clients.length){
   link('settings-export-btn', 'exportBtn');
   link('settings-import-btn', 'importBtn');
   link('settings-wipe-btn', 'wipeBtn');
+})();
+
+// ============================================================
+// PWA: service worker registration + install prompt + URL shortcuts
+// ============================================================
+(function pwa(){
+  // ── Service worker ──────────────────────────────────────
+  // Register on load (not at script-execution time) so the SW install
+  // doesn't compete with the initial page render for bandwidth.
+  if ('serviceWorker' in navigator && location.protocol !== 'file:'){
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').then(reg => {
+        // When a new SW is found and installs in the background, prompt the page
+        // to take it via SKIP_WAITING. Effect: next-load freshness without a hard refresh.
+        reg.addEventListener('updatefound', () => {
+          const newWorker = reg.installing;
+          if (!newWorker) return;
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller){
+              // A newer version is ready. Defer the swap to the next navigation —
+              // doing it mid-session would yank the rug out from under unsaved work.
+              console.log('[InvoYou] New version available — will activate on next launch.');
+            }
+          });
+        });
+      }).catch(err => console.warn('[InvoYou] SW registration failed:', err));
+    });
+  }
+
+  // ── Install prompt ──────────────────────────────────────
+  // Chrome/Edge fire `beforeinstallprompt` when the app meets PWA criteria
+  // AND isn't already installed. We capture the event and only surface the
+  // Install button when this event has fired — so visitors who can't install
+  // never see a useless button.
+  let deferredPrompt = null;
+  const installBox = document.getElementById('installApp');
+  const installLink = document.getElementById('installAppLink');
+
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();              // suppress Chrome's mini-infobar
+    deferredPrompt = e;
+    if (installBox) installBox.style.display = 'block';
+  });
+
+  if (installLink){
+    installLink.onclick = async (e) => {
+      e.preventDefault();
+      if (!deferredPrompt){
+        toast('Install via your browser menu → Add to Home Screen');
+        return;
+      }
+      deferredPrompt.prompt();
+      const result = await deferredPrompt.userChoice;
+      if (result.outcome === 'accepted'){
+        toast('Installing — check your home screen');
+      }
+      // The prompt can only be shown once. Discard it whichever way the user went.
+      deferredPrompt = null;
+      installBox.style.display = 'none';
+    };
+  }
+
+  // Once installed, hide the link (the app might still launch in browser mode briefly)
+  window.addEventListener('appinstalled', () => {
+    if (installBox) installBox.style.display = 'none';
+    deferredPrompt = null;
+  });
+
+  // ── URL shortcuts (manifest.json `shortcuts` entries) ──
+  // Manifest defines shortcuts like /?action=new-invoice that Android shows
+  // on long-press of the app icon. Handle them on boot.
+  const params = new URLSearchParams(location.search);
+  const action = params.get('action');
+  const viewParam = params.get('view');
+  if (action === 'new-invoice' || action === 'new-quote'){
+    setTimeout(() => {
+      const type = action === 'new-invoice' ? 'invoice' : 'quotation';
+      current = newDocument(type);
+      state.currentId = current.id;
+      fillForm(); updatePreview(); updateEditorTitle();
+      setView('editor');
+      // Clean the URL so a manual refresh doesn't keep recreating new docs
+      history.replaceState({}, '', location.pathname);
+    }, 50);
+  } else if (viewParam && ['history','clients','insights','settings','design'].includes(viewParam)){
+    setTimeout(() => {
+      setView(viewParam);
+      history.replaceState({}, '', location.pathname);
+    }, 50);
+  }
 })();
 </script>
 </body>
