@@ -585,80 +585,211 @@ input[type=file]{padding:6px;font-size:12px}
   font-size:16px; font-weight:500;
 }
 
-/* ----- STYLE: STUDIO ----- */
+/* ----- STYLE: STUDIO (yellow-block header, signature footer) -----
+   This layout takes its cue from the freelance-photographer invoice style:
+   a solid colored header block bleeds to the page edges, with the
+   business name at large and the amount-due block on the right. The
+   document body lives in white below it. Bottom strip carries the
+   signature image (when provided), business address, and contact info.
+*/
+.doc-style-studio{
+  /* The header bleeds full-bleed to the document edges, so we cancel the
+     standard side padding for it and re-apply via negative margins. */
+  padding-top:0; padding-left:0; padding-right:0;
+}
 .doc-style-studio .doc-head{
-  display:grid; grid-template-columns:auto 1fr auto; gap:24px;
-  align-items:start; margin-bottom:36px;
-  padding-bottom:24px; border-bottom:1px solid var(--doc-line);
+  display:grid;
+  grid-template-columns:1.4fr 1fr;
+  gap:0;
+  background:var(--doc-accent);
+  color:#0F0F0F;
+  padding:42px 46px;
+  margin:0 0 36px 0;
+  align-items:center;
 }
-.doc-style-studio .doc-brand-block{ display:flex; align-items:flex-start; gap:14px; }
-.doc-style-studio .doc-mark{
-  width:calc(68px * var(--logo-scale)); height:calc(68px * var(--logo-scale));
-  background:var(--doc-accent); color:#fff;
-  display:flex; align-items:center; justify-content:center;
-  font-family:var(--font-display);
-  font-size:calc(26px * var(--logo-scale));
-  font-weight:600; flex-shrink:0;
-  font-variation-settings:"SOFT" 50,"opsz" 80;
+/* Right "amount due" pocket — slightly darker tone of the accent */
+.doc-style-studio .doc-head > .doc-meta{
+  background:rgba(0,0,0,0.18);
+  margin:-42px -46px -42px 0;
+  padding:42px 46px;
+  align-self:stretch;
+  display:flex; flex-direction:column; justify-content:center;
+  text-align:right;
 }
+.doc-style-studio .doc-brand-block{ display:none; }   /* monogram lives elsewhere in this layout */
 .doc-style-studio .doc-business-name{
-  font-family:var(--font-display); font-size:26px; font-weight:500;
-  letter-spacing:-.015em; line-height:1.05;
-  font-variation-settings:"SOFT" 50,"opsz" 100;
+  font-family:var(--font-display);
+  font-size:34px; font-weight:700; letter-spacing:.02em;
+  line-height:1.05; text-transform:uppercase;
+  color:#0F0F0F;
+  font-variation-settings:"SOFT" 40,"opsz" 144;
 }
 .doc-style-studio .doc-business-tag{
-  font-size:10.5px; letter-spacing:.18em; text-transform:uppercase;
-  color:var(--doc-muted); margin-top:6px;
+  display:none;   /* the type ("INVOICE" / "QUOTATION") below replaces this */
 }
-.doc-style-studio .doc-business-detail{ font-size:11.5px; color:var(--doc-muted); margin-top:10px; }
-.doc-style-studio .doc-meta{text-align:right;align-self:flex-start}
+.doc-style-studio .doc-business-detail{ display:none; }  /* address moves to footer */
 .doc-style-studio .doc-type{
-  font-family:var(--font-body); font-size:11px; font-weight:600;
-  letter-spacing:.24em; text-transform:uppercase;
-  color:var(--doc-muted); margin-bottom:4px;
+  font-family:var(--font-body); font-size:12px; font-weight:600;
+  letter-spacing:.28em; text-transform:uppercase;
+  color:#0F0F0F; margin-top:8px; opacity:.85;
 }
-.doc-style-studio .doc-type em{font-style:normal;color:var(--doc-accent)}
-.doc-style-studio .doc-number{
-  font-family:var(--font-display); font-size:36px; font-weight:300;
-  font-variation-settings:"SOFT" 80,"opsz" 144;
-  line-height:1; letter-spacing:-.01em;
+.doc-style-studio .doc-type em{font-style:normal;color:inherit}
+.doc-style-studio .doc-head .doc-meta .doc-amount-label{
+  font-size:11px; font-weight:600; letter-spacing:.16em;
+  text-transform:uppercase; color:#0F0F0F; opacity:.8;
+  white-space:nowrap;
 }
-.doc-style-studio .doc-dates{
-  font-size:11.5px; text-align:right; margin-top:12px;
-  display:grid; grid-template-columns:auto auto; gap:3px 12px;
-  margin-left:auto; width:fit-content;
+.doc-style-studio .doc-head .doc-meta .doc-amount-value{
+  font-family:var(--font-display); font-size:30px; font-weight:600;
+  letter-spacing:-.01em; color:#0F0F0F; margin-top:8px;
+  font-variation-settings:"SOFT" 40,"opsz" 100;
+  white-space:nowrap;
 }
-.doc-style-studio .doc-dates dt{color:var(--doc-muted);font-size:10px;letter-spacing:.1em;text-transform:uppercase}
-.doc-style-studio .doc-dates dd{margin:0;font-family:var(--font-mono);font-size:11.5px}
+/* Hide the standard "doc-number" + "doc-dates" inside the header — they
+   get rendered separately under the BILL TO block in this layout */
+.doc-style-studio .doc-head .doc-number,
+.doc-style-studio .doc-head .doc-dates{ display:none; }
+
+/* BILL TO + meta sit side by side just under the header */
 .doc-style-studio .doc-billto{
-  display:grid; grid-template-columns:auto 1fr; align-items:start;
-  gap:20px; padding-bottom:24px; margin-bottom:24px;
-  border-bottom:1px solid var(--doc-line);
+  display:grid; grid-template-columns:1fr auto; align-items:start;
+  gap:40px; padding:0 46px;
+  margin-bottom:32px;
 }
 .doc-style-studio .doc-billto-label{
-  writing-mode:vertical-lr; transform:rotate(180deg);
-  font-size:10px; letter-spacing:.3em; text-transform:uppercase;
-  color:var(--doc-accent); font-weight:600; padding:2px 0;
+  font-size:11px; letter-spacing:.18em; text-transform:uppercase;
+  color:var(--doc-muted); font-weight:500;
+  margin-bottom:10px;
+  /* override the vertical-lr label of the previous studio variant */
+  writing-mode:horizontal-tb; transform:none; padding:0;
 }
 .doc-style-studio .doc-billto-name{
-  font-family:var(--font-display); font-size:24px; font-weight:500;
-  line-height:1.1; font-variation-settings:"SOFT" 60,"opsz" 100;
+  font-family:var(--font-body); font-size:16px; font-weight:700;
+  line-height:1.3; color:var(--doc-ink);
+  margin-bottom:2px;
+}
+.doc-style-studio .doc-billto-detail{
+  font-size:12.5px; color:var(--doc-ink); line-height:1.55;
+  margin-top:4px;
+}
+.doc-style-studio .doc-billto-address{
+  font-size:12.5px; color:var(--doc-ink); line-height:1.55;
+  margin-top:4px; white-space:pre-line;
+}
+.doc-style-studio .doc-billto-meta{
+  display:grid; grid-template-columns:auto auto; gap:6px 12px;
+  font-size:12px; align-content:start;
+}
+.doc-style-studio .doc-billto-meta dt{
+  color:var(--doc-ink); font-weight:700; text-align:right;
+}
+.doc-style-studio .doc-billto-meta dd{
+  margin:0; color:var(--doc-ink); font-family:var(--font-mono); font-size:12px;
+}
+.doc-style-studio .doc-billto-meta .amount-due-row dd{
+  font-family:var(--font-body); font-weight:600;
+}
+
+/* Items table — clean, no fills, divider above and below header row */
+.doc-style-studio .doc-items{
+  margin:0 46px 20px;
+  width:calc(100% - 92px);
 }
 .doc-style-studio .doc-items th{
-  text-align:left; font-size:9.5px; letter-spacing:.18em;
-  text-transform:uppercase; color:var(--doc-muted);
-  padding:0 8px 10px 0; font-weight:600;
-  border-bottom:2px solid var(--doc-accent);
+  text-align:left; font-size:13px; font-weight:700;
+  color:var(--doc-ink); padding:0 8px 12px 0;
+  border-bottom:1px solid var(--doc-ink); letter-spacing:0;
+  text-transform:none;
 }
+.doc-style-studio .doc-items th.num{text-align:right; padding-right:0; white-space:nowrap}
+.doc-style-studio .doc-items td.num{ white-space:nowrap; }
+/* Reserve enough room for currency strings so KSh / USD amounts don't wrap. */
+.doc-style-studio .doc-items thead th:nth-child(2){ width:9%; }   /* Days */
+.doc-style-studio .doc-items thead th:nth-child(4){ width:18%; }  /* Rate */
+.doc-style-studio .doc-items thead th:nth-child(5){ width:20%; }  /* Amount */
+.doc-style-studio .doc-items td{
+  padding:14px 8px; vertical-align:top;
+  border-bottom:1px solid var(--doc-line-soft);
+  font-size:13px;
+}
+.doc-style-studio .doc-items tbody tr:nth-child(even) td{
+  background:var(--doc-line-soft); /* zebra fill in the SOFT line tone */
+}
+/* hide the Unit column in studio: the references use Days/Rate/Amount only */
+.doc-style-studio .doc-items th:nth-child(3),
+.doc-style-studio .doc-items td:nth-child(3){ display:none; }
+/* relabel "Qty" to "Days" purely via the th text — we keep markup the same
+   for now and just override the text content via CSS::before */
+.doc-style-studio .doc-items thead th:nth-child(2)::before{ content:"Days"; }
+.doc-style-studio .doc-items thead th:nth-child(2){ font-size:0; text-align:right; padding-right:0; }
+.doc-style-studio .doc-items thead th:nth-child(2)::before{ font-size:13px; }
+.doc-style-studio .item-desc-main{ font-weight:700; color:var(--doc-ink); }
+.doc-style-studio .item-desc-sub{ color:var(--doc-muted); margin-top:4px; font-size:12px; }
+
+/* Totals area — minimal, right-aligned */
+.doc-style-studio .doc-totals{
+  margin:0 46px 28px; padding:0;
+  background:transparent; border:none;
+  display:flex; flex-direction:column; align-items:flex-end;
+}
+.doc-style-studio .doc-totals-row{
+  display:flex; justify-content:space-between; align-items:baseline;
+  gap:40px;
+  padding:6px 0; min-width:46%; font-size:13px;
+  white-space:nowrap;
+}
+.doc-style-studio .doc-totals-row .lbl{ color:var(--doc-ink); font-weight:600; }
+.doc-style-studio .doc-totals-row .val{ font-family:var(--font-mono); }
 .doc-style-studio .doc-totals-row.grand{
-  background:var(--doc-accent); color:#fff;
-  margin:8px -18px -10px; padding:14px 18px;
-  font-size:16px; font-weight:600;
-  font-family:var(--font-display);
-  font-variation-settings:"SOFT" 50,"opsz" 80;
-  border-top:none;
+  background:transparent; color:var(--doc-ink);
+  margin:0; padding:14px 0 4px;
+  font-size:13px; font-weight:700;
+  font-family:var(--font-body);
+  border-top:1px solid var(--doc-line);
+  min-width:46%;
+  font-variation-settings:normal;
 }
-.doc-style-studio .doc-totals-row.grand .lbl{color:#fff}
+.doc-style-studio .doc-totals-row.grand .lbl{ color:var(--doc-ink); }
+.doc-style-studio .doc-totals-row.grand .val{ font-family:var(--font-body); }
+
+/* Notes/terms — full width, beneath totals */
+.doc-style-studio .doc-footer{
+  padding:0 46px 24px;
+  display:grid; grid-template-columns:1fr 1fr; gap:32px;
+}
+.doc-style-studio .doc-footer-label{
+  font-size:11px; letter-spacing:.18em; text-transform:uppercase;
+  color:var(--doc-muted); font-weight:600; margin-bottom:6px;
+}
+.doc-style-studio .doc-footer-body{ font-size:12.5px; line-height:1.6; white-space:pre-line; }
+
+/* Signature row at the very bottom of the last page */
+.doc-style-studio .doc-sigblock{
+  padding:24px 46px 0;
+  border-top:1px solid var(--doc-line);
+  display:grid; grid-template-columns:auto 1.2fr 1.4fr; gap:24px;
+  align-items:end;
+  font-size:11.5px; line-height:1.55;
+}
+.doc-style-studio .doc-sigblock-sig{ }
+.doc-style-studio .doc-sigblock-sig img{
+  max-width:180px; max-height:64px; object-fit:contain;
+  display:block;
+}
+.doc-style-studio .doc-sigblock-business{ text-align:left; }
+.doc-style-studio .doc-sigblock-business-name{
+  font-weight:700; text-transform:uppercase; letter-spacing:.05em;
+  font-size:11.5px; color:var(--doc-ink); margin-bottom:4px;
+}
+.doc-style-studio .doc-sigblock-contact{ text-align:right; white-space:nowrap; }
+.doc-style-studio .doc-sigblock-contact-label{
+  font-weight:700; text-transform:uppercase; letter-spacing:.05em;
+  font-size:11.5px; color:var(--doc-ink); margin-bottom:4px;
+}
+
+/* Hide the old text stamp on Studio — signature image takes its place */
+.doc-style-studio .doc-stamp{ display:none; }
+
 
 /* ----- shared doc bits ----- */
 .doc-items{ width:100%; border-collapse:collapse; margin-bottom:18px; font-size:12px; }
@@ -1075,39 +1206,54 @@ input[type=file]{padding:6px;font-size:12px}
     align-items:flex-start;
     gap:16px;
   }
-  .doc-style-studio .doc-head{
-    grid-template-columns:1fr;
-    gap:14px;
-  }
   .doc-style-editorial .doc-meta,
-  .doc-style-modern .doc-meta,
-  .doc-style-studio .doc-meta{ text-align:left; }
+  .doc-style-modern .doc-meta{ text-align:left; }
   .doc-style-editorial .doc-dates,
-  .doc-style-modern .doc-dates,
-  .doc-style-studio .doc-dates{
+  .doc-style-modern .doc-dates{
     margin-left:0; margin-right:auto; text-align:left;
   }
   .doc-style-classic .doc-dates{ gap:18px; flex-wrap:wrap; }
 
-  /* Doc heading font sizes */
+  /* Doc heading font sizes on mobile */
   .doc-style-editorial .doc-business-name,
-  .doc-style-modern .doc-business-name,
-  .doc-style-studio .doc-business-name{ font-size:18px; }
+  .doc-style-modern .doc-business-name{ font-size:18px; }
   .doc-style-classic .doc-business-name{ font-size:22px; }
+  .doc-style-studio .doc-business-name{ font-size:24px; }
   .doc-style-editorial .doc-type{ font-size:24px; }
   .doc-style-classic .doc-type{ font-size:20px; letter-spacing:.12em; }
-  .doc-style-studio .doc-number{ font-size:26px; }
   .doc-style-modern .doc-number{ font-size:24px; }
 
-  /* Bill-to: stack label above body in grid layouts; flatten Studio's vertical label */
-  .doc-style-classic .doc-billto,
-  .doc-style-studio .doc-billto{
+  /* Bill-to: stack label above body in grid layouts */
+  .doc-style-classic .doc-billto{
     grid-template-columns:1fr;
     gap:6px;
   }
-  .doc-style-studio .doc-billto-label{
-    writing-mode:horizontal-tb; transform:none;
+  /* Studio mobile: collapse the side-by-side bill-to + meta to stacked,
+     shrink header padding so the yellow block isn't comically tall */
+  .doc-style-studio .doc-head{
+    padding:28px 24px;
   }
+  .doc-style-studio .doc-head > .doc-meta{
+    margin:-28px -24px -28px 0;
+    padding:28px 24px;
+  }
+  .doc-style-studio .doc-billto{
+    grid-template-columns:1fr;
+    gap:18px;
+    padding:0 24px;
+  }
+  .doc-style-studio .doc-billto-meta{ grid-template-columns:auto 1fr; }
+  .doc-style-studio .doc-billto-meta dt{ text-align:left; }
+  .doc-style-studio .doc-items{ margin:0 24px 20px; width:calc(100% - 48px); }
+  .doc-style-studio .doc-totals,
+  .doc-style-studio .doc-footer{ padding-left:24px; padding-right:24px; }
+  .doc-style-studio .doc-sigblock{
+    padding:24px 24px 0;
+    grid-template-columns:1fr;
+    gap:14px; text-align:left;
+  }
+  .doc-style-studio .doc-sigblock-contact{ text-align:left; }
+  .doc-style-studio .doc-head .doc-meta .doc-amount-value{ font-size:24px; }
 
   /* Doc items table: tighten cells */
   .doc-items{ font-size:10.5px; }
@@ -1212,17 +1358,109 @@ input[type=file]{padding:6px;font-size:12px}
   }
 }
 
-/* ===== PRINT ===== */
+/* ===== PRINT / PDF =====
+   A4 with uniform margins. Page numbers in the bottom-right corner ("Page 1 of 3").
+   Top-right margin shows the doc number on continuation pages so multi-page
+   invoices read as one coherent document. Table rows and totals never split
+   across page boundaries; the signature block stays whole on the last page.
+*/
 @media print{
-  body{background:#fff}
-  .sidebar,.view-header,.preview-actions,.form-card,.editor > div:first-child{display:none !important}
-  .app{display:block}
-  .main{padding:0;max-width:none}
-  .editor{grid-template-columns:1fr;display:block}
-  .preview-wrap{position:static}
-  .preview-frame{border:none;box-shadow:none;border-radius:0}
-  .document{padding:36mm 22mm 28mm}
-  @page{size:A4;margin:0}
+  /* hide app chrome */
+  .sidebar, .view-header, .preview-actions, .form-card,
+  .editor > div:first-child{ display:none !important; }
+  body{ background:#fff; }
+  .app{ display:block; }
+  .main{ padding:0; max-width:none; }
+  .editor{ grid-template-columns:1fr; display:block; }
+  .preview-wrap{ position:static; }
+  /* Strip the page-edge border, shadow, rounding in the export */
+  .preview-frame{
+    border:none !important;
+    box-shadow:none !important;
+    border-radius:0 !important;
+    background:transparent !important;
+    overflow:visible !important;
+  }
+  /* The .document is what becomes the printed body. Padding is controlled
+     by @page margins, not by the document itself, so content aligns the
+     same way on every page. */
+  .document{
+    padding:0 !important;
+    background:#fff !important;
+    box-shadow:none !important;
+    border:none !important;
+  }
+
+  /* A4 page with uniform margins. Bottom-right shows "Page N of M".
+     (Chrome's print engine reliably supports counter(page)/counter(pages)
+     in @page margin boxes; string-set/element-based running content is
+     less reliable across versions, so we keep just page numbers here.) */
+  @page{
+    size:A4;
+    margin:14mm 14mm 18mm 14mm;
+
+    @bottom-right{
+      content:"Page " counter(page) " of " counter(pages);
+      font-family:'Inter',ui-sans-serif,system-ui,sans-serif;
+      font-size:9pt;
+      color:#6B6B70;
+    }
+  }
+  /* Pagination: keep critical blocks together. Tables flow naturally
+     across page breaks (Chrome will split tbody but never split a tr). */
+  .doc-items{
+    page-break-inside:auto;
+  }
+  .doc-items thead{
+    display:table-header-group;   /* repeats on every page break */
+  }
+  .doc-items tr{
+    page-break-inside:avoid;
+    break-inside:avoid;
+  }
+  .doc-totals, .doc-totals-row{
+    page-break-inside:avoid;
+    break-inside:avoid;
+  }
+  .doc-sigblock, .doc-footer{
+    page-break-inside:avoid;
+    break-inside:avoid;
+  }
+  .doc-totals-row.grand{
+    page-break-before:avoid;
+  }
+
+  /* Studio's full-bleed header bleeds out to the @page margin edges so
+     the yellow truly reaches the trim line in PDFs. Other layouts use
+     normal in-flow padding so they stay neatly within margins. */
+  .doc-style-studio .doc-head{
+    margin:-14mm -14mm 24px -14mm !important;
+    padding:18mm 18mm 14mm 18mm !important;
+  }
+  .doc-style-studio .doc-head > .doc-meta{
+    margin:-18mm -18mm -14mm 0 !important;
+    padding:18mm 18mm 14mm 18mm !important;
+  }
+  /* Reset side padding on studio body sections so columns sit flush at
+     the @page margin and align identically across all pages. */
+  .doc-style-studio .doc-billto,
+  .doc-style-studio .doc-items,
+  .doc-style-studio .doc-totals,
+  .doc-style-studio .doc-footer,
+  .doc-style-studio .doc-sigblock{
+    padding-left:0 !important;
+    padding-right:0 !important;
+    margin-left:0 !important;
+    margin-right:0 !important;
+    width:100% !important;
+  }
+
+  /* Print-safe rendering of color backgrounds (yellow header, etc.).
+     Without these, some browsers strip background colors to "save ink".  */
+  *{
+    -webkit-print-color-adjust:exact !important;
+            print-color-adjust:exact !important;
+  }
 }
 ::selection{background:var(--accent);color:#fff}
 </style>
@@ -1663,6 +1901,15 @@ input[type=file]{padding:6px;font-size:12px}
           </div>
 
           <div class="form-row" style="margin-top:14px;padding-top:14px;border-top:1px dashed var(--line)">
+            <label>Signature image <span style="font-weight:400;color:var(--muted);font-size:11px">(shown on the Studio layout; PNG with transparent background works best)</span></label>
+            <input id="s-biz-signature" type="file" accept="image/*" />
+            <div id="signaturePreview" style="margin-top:8px;display:none">
+              <img id="signaturePreviewImg" style="max-height:60px;max-width:200px;border:1px solid var(--line);padding:8px;background:#fff;border-radius:4px" />
+              <button class="btn btn-sm btn-danger" id="removeSignatureBtn" style="vertical-align:top;margin-left:8px">Remove</button>
+            </div>
+          </div>
+
+          <div class="form-row" style="margin-top:14px;padding-top:14px;border-top:1px dashed var(--line)">
             <label>Footer signature line (use {name} and {business} as placeholders)</label>
             <input id="s-biz-stamp" type="text" placeholder="— Prepared by {name} · {business} —" />
             <div style="font-size:11px;color:var(--muted);margin-top:4px">
@@ -1733,9 +1980,12 @@ input[type=file]{padding:6px;font-size:12px}
           <div class="form-row">
             <label>Email channel</label>
             <select id="s-email-channel">
-              <option value="gmail">Gmail web (opens in browser)</option>
-              <option value="mailto">Default mail app (mailto:)</option>
+              <option value="gmail">Gmail web on desktop · mail app on mobile</option>
+              <option value="mailto">Default mail app everywhere</option>
             </select>
+            <div style="font-size:11px;color:var(--muted);margin-top:4px">
+              On phones, the mail app handles the compose either way — mobile Gmail web URLs sometimes drop the prefilled fields.
+            </div>
           </div>
           <div class="form-row" style="margin-top:11px">
             <label>Invoice email subject template</label>
@@ -1868,7 +2118,7 @@ input[type=file]{padding:6px;font-size:12px}
             </button>
             <button class="theme-swatch" data-layout="studio">
               <div class="swatch-name">Studio</div>
-              <div style="font-size:10.5px;color:var(--muted);margin-top:3px">Big logo, accent block, modern grid</div>
+              <div style="font-size:10.5px;color:var(--muted);margin-top:3px">Full-bleed header, amount pocket, signature</div>
             </button>
           </div>
         </div>
@@ -2286,6 +2536,7 @@ const DEFAULTS = {
     address: "Nairobi, Kenya",
     logo: null,         // dataURL string or null
     logoScale: 100,     // 50..200
+    signature: null,    // dataURL string or null (used by Studio layout)
     stampLine: "— Prepared by {name} · {business} —"
   },
   settings: {
@@ -2713,22 +2964,22 @@ function renderDocument(doc){
         </div>
       </div>`;
   } else if (layout === 'studio'){
+    // Full-bleed colored header. Big business name on the left with the
+    // type ("INVOICE" / "QUOTATION") subtitle below. Right pocket holds the
+    // "Amount Due" label + value. Numbering and dates render under the
+    // bill-to section, not in the header.
+    const amountLabel = doc.type === 'invoice'
+      ? `Amount Due (${doc.currency})`
+      : `Total (${doc.currency})`;
     headerHTML = `
       <div class="doc-head">
-        <div class="doc-brand-block">${logoHtml}</div>
         <div>
           <div class="doc-business-name">${esc(b.name||'')}</div>
-          ${b.tagline? `<div class="doc-business-tag">${esc(b.tagline)}</div>` : ''}
-          <div class="doc-business-detail">${addressLine}${addressLine && businessDetails ? '<br>' : ''}${businessDetails}${vatLine? '<br>'+vatLine : ''}</div>
+          <div class="doc-type">${doc.type === 'invoice' ? 'Invoice' : 'Quotation'}</div>
         </div>
         <div class="doc-meta">
-          <div class="doc-type">${typeHTML}</div>
-          <div class="doc-number">${esc(doc.number||'')}</div>
-          <dl class="doc-dates">
-            <dt>Date</dt><dd>${fmtDate(doc.issueDate)}</dd>
-            <dt>${dueLabel}</dt><dd>${fmtDate(doc.dueDate)}</dd>
-            ${poRow}
-          </dl>
+          <div class="doc-amount-label">${amountLabel}</div>
+          <div class="doc-amount-value">${fmtMoney(t.total, cur)}</div>
         </div>
       </div>`;
   } else {
@@ -2756,14 +3007,32 @@ function renderDocument(doc){
   }
 
   // billto — body wrapper keeps grid layouts (Classic, Studio) aligned correctly
+  // For Studio, we add a right-aligned meta block with invoice number,
+  // dates, and amount due — matching the reference design.
+  let studioMetaHTML = '';
+  if (layout === 'studio'){
+    const rows = [];
+    rows.push(`<dt>${doc.type === 'invoice' ? 'Invoice Number:' : 'Quotation Number:'}</dt><dd>${esc(doc.number||'')}</dd>`);
+    if (doc.type === 'invoice' && doc.clientPo && doc.clientPo.trim()){
+      rows.push(`<dt>P.O. Number:</dt><dd>${esc(doc.clientPo.trim())}</dd>`);
+    }
+    rows.push(`<dt>${doc.type === 'invoice' ? 'Invoice Date:' : 'Issue Date:'}</dt><dd>${fmtDate(doc.issueDate)}</dd>`);
+    rows.push(`<dt>${doc.type === 'invoice' ? 'Payment Due:' : 'Valid Until:'}</dt><dd>${fmtDate(doc.dueDate)}</dd>`);
+    rows.push(`<dt class="amount-due-row">Amount Due (${doc.currency}):</dt><dd class="amount-due-row">${fmtMoney(t.total, cur)}</dd>`);
+    studioMetaHTML = `<dl class="doc-billto-meta">${rows.join('')}</dl>`;
+  }
+
   const billtoHTML = `
     <div class="doc-billto">
-      <div class="doc-billto-label">Billed to</div>
-      <div class="doc-billto-body">
-        <div class="doc-billto-name">${esc(doc.client.name) || '<span style="color:var(--doc-muted);font-weight:400">— Client name —</span>'}</div>
-        ${btContact.length ? `<div class="doc-billto-detail">${btContact.join(' · ')}</div>` : ''}
-        ${btAddress ? `<div class="doc-billto-address">${btAddress}</div>` : ''}
+      <div>
+        <div class="doc-billto-label">Bill to</div>
+        <div class="doc-billto-body">
+          <div class="doc-billto-name">${esc(doc.client.name) || '<span style="color:var(--doc-muted);font-weight:400">— Client name —</span>'}</div>
+          ${btContact.length ? `<div class="doc-billto-detail">${btContact.join(' · ')}</div>` : ''}
+          ${btAddress ? `<div class="doc-billto-address">${btAddress}</div>` : ''}
+        </div>
       </div>
+      ${studioMetaHTML}
     </div>`;
 
   // totals
@@ -2789,11 +3058,41 @@ function renderDocument(doc){
       </div>
     </div>` : '';
 
-  // stamp
+  // Studio-only signature block — signature image + business address + contact info
+  // Sits at the bottom of the document. Hidden on other layouts via CSS.
+  let sigBlockHTML = '';
+  if (layout === 'studio'){
+    const sigImg = b.signature
+      ? `<img src="${b.signature}" alt="Signature" />`
+      : '';
+    const bizName = esc(b.name || '');
+    const bizAddr = b.address
+      ? esc(b.address).replace(/\n/g,'<br>')
+      : '';
+    const phoneLine = b.phone ? `Phone: ${esc(b.phone)}` : '';
+    const emailLine = b.email ? `Email: ${esc(b.email)}` : '';
+    const webLine = b.website ? esc(b.website) : '';
+    sigBlockHTML = `
+      <div class="doc-sigblock">
+        <div class="doc-sigblock-sig">${sigImg}</div>
+        <div class="doc-sigblock-business">
+          ${bizName ? `<div class="doc-sigblock-business-name">${bizName}</div>` : ''}
+          ${bizAddr ? `<div>${bizAddr}</div>` : ''}
+        </div>
+        <div class="doc-sigblock-contact">
+          ${(phoneLine || emailLine || webLine) ? `<div class="doc-sigblock-contact-label">Contact Information</div>` : ''}
+          ${phoneLine ? `<div>${phoneLine}</div>` : ''}
+          ${emailLine ? `<div>${emailLine}</div>` : ''}
+          ${webLine ? `<div>${webLine}</div>` : ''}
+        </div>
+      </div>`;
+  }
+
+  // stamp (legacy text-stamp — hidden on studio via CSS)
   const stampText = fillTemplate(b.stampLine, { name:b.contact||'', business:b.name||'' });
   const stampHTML = stampText.trim() ? `<div class="doc-stamp">${esc(stampText)}</div>` : '';
 
-  return headerHTML + billtoHTML + buildItemsTable(itemsHtml) + totalsHTML + footerHTML + stampHTML;
+  return headerHTML + billtoHTML + buildItemsTable(itemsHtml) + totalsHTML + footerHTML + sigBlockHTML + stampHTML;
 }
 
 function buildItemsTable(rows){
@@ -3221,19 +3520,7 @@ function doSend(){
   const via = document.getElementById('sm-via').value;
   if (!to){ toast('Recipient email required'); return; }
 
-  let url;
-  if (via === 'gmail'){
-    url = `https://mail.google.com/mail/?view=cm&fs=1`
-      + `&to=${encodeURIComponent(to)}`
-      + (cc? `&cc=${encodeURIComponent(cc)}` : '')
-      + `&su=${encodeURIComponent(sub)}`
-      + `&body=${encodeURIComponent(body)}`;
-    window.open(url, '_blank');
-  } else {
-    url = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(sub)}&body=${encodeURIComponent(body)}`
-      + (cc? `&cc=${encodeURIComponent(cc)}` : '');
-    window.location.href = url;
-  }
+  openMailComposer({ to, cc, subject:sub, body, via });
 
   // mark sent
   current.status = current.type==='quotation' ? 'sent' : 'sent';
@@ -3242,6 +3529,49 @@ function doSend(){
   fillForm();
   document.getElementById('sendModalBg').classList.remove('open');
   toast('Composing email…');
+}
+
+// Detect mobile devices where Gmail web URL gets hijacked by the Gmail app
+// and the query string is silently dropped, leaving an empty compose.
+function isMobileDevice(){
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+}
+
+// Universal mail composer:
+//   - On desktop with Gmail mode: open Gmail web compose (params reach Gmail reliably)
+//   - On mobile (any mode): use mailto: scheme so the OS handles routing.
+//     Mobile Gmail/Apple Mail respect mailto: params perfectly. Trying to open
+//     mail.google.com on mobile triggers an intent capture by the Gmail app
+//     that drops the query string, leaving an empty compose — that's the bug
+//     we're working around.
+//   - When using mailto:, keep the body under ~1800 chars to stay within
+//     iOS Safari's URL length limit (some older Androids cap around 8K).
+function openMailComposer({ to, cc, subject, body, via }){
+  const mobile = isMobileDevice();
+  const useGmailWeb = (via === 'gmail') && !mobile;
+
+  if (useGmailWeb){
+    const url = 'https://mail.google.com/mail/?view=cm&fs=1'
+      + '&to=' + encodeURIComponent(to)
+      + (cc ? '&cc=' + encodeURIComponent(cc) : '')
+      + '&su=' + encodeURIComponent(subject || '')
+      + '&body=' + encodeURIComponent(body || '');
+    window.open(url, '_blank');
+    return;
+  }
+
+  // mailto: path (covers all mobile cases + desktop "mailto" choice)
+  const MAX_MAILTO = 1800;
+  const truncatedBody = (body && body.length > MAX_MAILTO)
+    ? body.slice(0, MAX_MAILTO) + '\n\n[…truncated — please use desktop or paste the rest]'
+    : (body || '');
+  const params = [
+    'subject=' + encodeURIComponent(subject || ''),
+    'body=' + encodeURIComponent(truncatedBody)
+  ];
+  if (cc) params.unshift('cc=' + encodeURIComponent(cc));
+  const url = 'mailto:' + encodeURIComponent(to) + '?' + params.join('&');
+  window.location.href = url;
 }
 
 document.getElementById('sm-cancel').onclick = () => document.getElementById('sendModalBg').classList.remove('open');
@@ -3267,13 +3597,7 @@ function sendReminder(docId){
   const sub = fillTemplate(state.settings.emailSubRem, vars);
   const body = fillTemplate(state.settings.emailBodyRem, vars);
   const via = state.settings.emailChannel || 'gmail';
-  let url;
-  if (via === 'gmail'){
-    url = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(d.client.email)}&su=${encodeURIComponent(sub)}&body=${encodeURIComponent(body)}`;
-    window.open(url, '_blank');
-  } else {
-    window.location.href = `mailto:${encodeURIComponent(d.client.email)}?subject=${encodeURIComponent(sub)}&body=${encodeURIComponent(body)}`;
-  }
+  openMailComposer({ to:d.client.email, cc:'', subject:sub, body, via });
   toast('Reminder composed');
 }
 
@@ -3446,6 +3770,50 @@ function showLogoPreview(){
   const img = document.getElementById('logoPreviewImg');
   if (state.business.logo){
     img.src = state.business.logo;
+    wrap.style.display = 'block';
+  } else {
+    wrap.style.display = 'none';
+  }
+}
+
+// Signature upload — same pattern as logo, but constrained to a wider, shorter
+// aspect (signatures are typically rectangular). PNG preferred to keep
+// transparency around the strokes.
+function handleSignatureUpload(file){
+  const reader = new FileReader();
+  reader.onload = ev => {
+    if (file.type === 'image/svg+xml'){
+      state.business.signature = ev.target.result;
+      showSignaturePreview(); saveState(); if (current) updatePreview();
+      return;
+    }
+    const img = new Image();
+    img.onload = () => {
+      const maxDim = 600;     // signatures look better with a bit more resolution
+      let w = img.width, h = img.height;
+      if (w > maxDim || h > maxDim){
+        const ratio = Math.min(maxDim/w, maxDim/h);
+        w = Math.round(w*ratio); h = Math.round(h*ratio);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      let dataUrl = canvas.toDataURL('image/png');
+      if (dataUrl.length > 250000) dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+      state.business.signature = dataUrl;
+      showSignaturePreview(); saveState(); if (current) updatePreview();
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+function showSignaturePreview(){
+  const wrap = document.getElementById('signaturePreview');
+  const img = document.getElementById('signaturePreviewImg');
+  if (!wrap || !img) return;
+  if (state.business.signature){
+    img.src = state.business.signature;
     wrap.style.display = 'block';
   } else {
     wrap.style.display = 'none';
@@ -3816,11 +4184,7 @@ function emailInsightsToSelf(){
   const body = lines.join('\n');
 
   const via = state.settings.emailChannel || 'gmail';
-  if (via === 'gmail'){
-    window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}&su=${encodeURIComponent(sub)}&body=${encodeURIComponent(body)}`, '_blank');
-  } else {
-    window.location.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(sub)}&body=${encodeURIComponent(body)}`;
-  }
+  openMailComposer({ to, cc:'', subject:sub, body, via });
   toast('Composing your snapshot…');
 }
 
@@ -3850,6 +4214,7 @@ function fillSettingsForm(){
   g('s-biz-logo-scale').value = b.logoScale;
   g('logoScaleVal').textContent = b.logoScale;
   showLogoPreview();
+  showSignaturePreview();
 
   g('s-def-currency').value = s.defCurrency;
   g('s-def-vat').value = s.defVat;
@@ -4194,7 +4559,7 @@ document.getElementById('s-sync-wipe').onclick = async () => {
 
 document.getElementById('resetSettingsBtn').onclick = () => {
   if (!confirm('Reset business details, prefixes, and defaults? (Your documents, clients, and sync key stay.)')) return;
-  state.business = {...structuredClone(DEFAULTS.business), logo: state.business.logo};
+  state.business = {...structuredClone(DEFAULTS.business), logo: state.business.logo, signature: state.business.signature};
   state.settings = structuredClone(DEFAULTS.settings);
   saveState(); fillSettingsForm(); toast('Reset');
 };
@@ -4212,6 +4577,16 @@ document.getElementById('s-biz-logo-scale').oninput = e => {
   document.getElementById('logoScaleVal').textContent = e.target.value;
   state.business.logoScale = Number(e.target.value);
   applyDesign(); if (current) updatePreview();
+};
+
+// signature file input (used by Studio layout)
+document.getElementById('s-biz-signature').onchange = e => {
+  const file = e.target.files[0];
+  if (file) handleSignatureUpload(file);
+};
+document.getElementById('removeSignatureBtn').onclick = () => {
+  state.business.signature = null;
+  showSignaturePreview(); saveState(); if (current) updatePreview();
 };
 
 // ============================================================
