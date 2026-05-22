@@ -2237,12 +2237,20 @@ function renderSidebarSignIn(){
     if (link){
       link.onclick = (e) => {
         e.preventDefault();
-        // Trigger Access auth by hitting a protected path. The browser handles the redirect
-        // to Google, then back to our page. After return, /api/whoami will recognize us.
-        // We open in the same window so the auth cookie is set on the right origin.
-        // Use a marker query param so the page knows to re-fetch identity after redirect-back.
-        const returnTo = location.origin + location.pathname + '?creator-signed-in=1';
-        location.href = '/cdn-cgi/access/login/' + encodeURIComponent(returnTo);
+        // Navigate directly to a protected endpoint. Cloudflare Access intercepts,
+        // sends user through Google sign-in, then bounces them back here with the
+        // auth cookie set. We use a query param so the landing page knows to
+        // re-check identity after the round-trip.
+        //
+        // Cloudflare Access reads the Referer / current page on success and bounces
+        // the user back to wherever they were trying to go. By hitting the homepage
+        // with ?creator-signed-in=1, we end up back at the same URL after auth.
+        // The protected endpoint (/api/whoami) is hit first, triggering Access,
+        // then Cloudflare 302s back to the originating page.
+        //
+        // Build URL: append ?creator-signed-in=1 so the landing page can react.
+        const returnUrl = location.origin + location.pathname + '?creator-signed-in=1';
+        location.href = '/cdn-cgi/access/login/invoyou.com?redirect_url=' + encodeURIComponent(returnUrl);
       };
     }
   }
