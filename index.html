@@ -763,28 +763,37 @@ input[type=file]{padding:6px;font-size:12px}
 }
 .doc-style-studio .doc-footer-body{ font-size:12.5px; line-height:1.6; white-space:pre-line; }
 
-/* Signature row at the very bottom of the last page */
-.doc-style-studio .doc-sigblock{
-  padding:24px 46px 0;
+/* Signature/contact footer — base styles, applied to ALL layouts.
+   Sits at the bottom of the document. Three columns: signature image,
+   business address, contact info. Layout-specific styles below can tweak
+   spacing or alignment. */
+.doc-sigblock{
+  margin-top:32px;
+  padding-top:24px;
   border-top:1px solid var(--doc-line);
   display:grid; grid-template-columns:auto 1.2fr 1.4fr; gap:24px;
   align-items:end;
   font-size:11.5px; line-height:1.55;
 }
-.doc-style-studio .doc-sigblock-sig{ }
-.doc-style-studio .doc-sigblock-sig img{
+.doc-sigblock-sig img{
   max-width:180px; max-height:64px; object-fit:contain;
   display:block;
 }
-.doc-style-studio .doc-sigblock-business{ text-align:left; }
-.doc-style-studio .doc-sigblock-business-name{
+.doc-sigblock-business{ text-align:left; }
+.doc-sigblock-business-name{
   font-weight:700; text-transform:uppercase; letter-spacing:.05em;
   font-size:11.5px; color:var(--doc-ink); margin-bottom:4px;
 }
-.doc-style-studio .doc-sigblock-contact{ text-align:right; white-space:nowrap; }
-.doc-style-studio .doc-sigblock-contact-label{
+.doc-sigblock-contact{ text-align:right; white-space:nowrap; }
+.doc-sigblock-contact-label{
   font-weight:700; text-transform:uppercase; letter-spacing:.05em;
   font-size:11.5px; color:var(--doc-ink); margin-bottom:4px;
+}
+
+/* Studio uses different horizontal padding because its body is edge-flush */
+.doc-style-studio .doc-sigblock{
+  margin-top:0;
+  padding:24px 46px 0;
 }
 
 /* Hide the old text stamp on Studio — signature image takes its place */
@@ -1732,6 +1741,10 @@ input[type=file]{padding:6px;font-size:12px}
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M4 6V2h8v4M4 11H2v-4a1 1 0 011-1h10a1 1 0 011 1v4h-2M4 10h8v4H4z"/></svg>
               Print / PDF
             </button>
+            <button class="btn" id="exportPdfBtn">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M8 1v10M4 7l4 4 4-4M2 13h12"/></svg>
+              Export
+            </button>
           </div>
 
           <div class="preview-frame">
@@ -2337,9 +2350,9 @@ input[type=file]{padding:6px;font-size:12px}
       <textarea id="sm-body" rows="9"></textarea>
     </div>
 
-    <div id="sm-attach-note" style="margin-top:11px;padding:10px 12px;background:var(--bg-input);border-radius:6px;font-size:12px;display:none">
-      <strong style="font-family:var(--font-display);font-weight:500">A note on attachments:</strong>
-      Email composers can't accept files via a link, so click <em>Download attachments</em> below first — your <span id="sm-attach-count"></span> attachment(s) will save to your Downloads folder. Then drag them into the email window.
+    <div id="sm-attach-note" style="margin-top:11px;padding:10px 12px;background:var(--bg-input);border-radius:6px;font-size:12px">
+      <strong style="font-family:var(--font-display);font-weight:500">PDF will be downloaded automatically.</strong>
+      When you click <em>Open in mail</em>, the document PDF saves to your Downloads folder and a compose window opens. Drag the PDF (and any other attachments you may have added) into the email before sending.
     </div>
 
     <div class="modal-actions">
@@ -2908,9 +2921,10 @@ function renderDocument(doc){
     </tr>`;
   }).join('');
 
-  // billto — inline contact details (single line, ·-separated) + address as its own block
+  // billto — client name first, then each contact detail on its own line,
+  // then address block. No "Attn:" prefix (request: just the contact's name).
   const btContact = [];
-  if (doc.client.contact) btContact.push('Attn: ' + esc(doc.client.contact));
+  if (doc.client.contact) btContact.push(esc(doc.client.contact));
   if (doc.client.email)   btContact.push(esc(doc.client.email));
   if (doc.client.phone)   btContact.push(esc(doc.client.phone));
   if (doc.client.website) btContact.push(esc(doc.client.website));
@@ -3018,7 +3032,7 @@ function renderDocument(doc){
     }
     rows.push(`<dt>${doc.type === 'invoice' ? 'Invoice Date:' : 'Issue Date:'}</dt><dd>${fmtDate(doc.issueDate)}</dd>`);
     rows.push(`<dt>${doc.type === 'invoice' ? 'Payment Due:' : 'Valid Until:'}</dt><dd>${fmtDate(doc.dueDate)}</dd>`);
-    rows.push(`<dt class="amount-due-row">Amount Due (${doc.currency}):</dt><dd class="amount-due-row">${fmtMoney(t.total, cur)}</dd>`);
+    // Amount Due is shown in the yellow header pocket — no need to repeat it here.
     studioMetaHTML = `<dl class="doc-billto-meta">${rows.join('')}</dl>`;
   }
 
@@ -3028,7 +3042,7 @@ function renderDocument(doc){
         <div class="doc-billto-label">Bill to</div>
         <div class="doc-billto-body">
           <div class="doc-billto-name">${esc(doc.client.name) || '<span style="color:var(--doc-muted);font-weight:400">— Client name —</span>'}</div>
-          ${btContact.length ? `<div class="doc-billto-detail">${btContact.join(' · ')}</div>` : ''}
+          ${btContact.length ? `<div class="doc-billto-detail">${btContact.map(x => `<div>${x}</div>`).join('')}</div>` : ''}
           ${btAddress ? `<div class="doc-billto-address">${btAddress}</div>` : ''}
         </div>
       </div>
@@ -3058,10 +3072,11 @@ function renderDocument(doc){
       </div>
     </div>` : '';
 
-  // Studio-only signature block — signature image + business address + contact info
-  // Sits at the bottom of the document. Hidden on other layouts via CSS.
+  // Signature/contact footer — appears at the bottom of EVERY layout.
+  // Provides "your name + address + contact info + signature image" closing block.
+  // The footer is suppressed entirely only if there's nothing to show.
   let sigBlockHTML = '';
-  if (layout === 'studio'){
+  {
     const sigImg = b.signature
       ? `<img src="${b.signature}" alt="Signature" />`
       : '';
@@ -3072,7 +3087,9 @@ function renderDocument(doc){
     const phoneLine = b.phone ? `Phone: ${esc(b.phone)}` : '';
     const emailLine = b.email ? `Email: ${esc(b.email)}` : '';
     const webLine = b.website ? esc(b.website) : '';
-    sigBlockHTML = `
+    const hasAnything = sigImg || bizName || bizAddr || phoneLine || emailLine || webLine;
+    if (hasAnything){
+      sigBlockHTML = `
       <div class="doc-sigblock">
         <div class="doc-sigblock-sig">${sigImg}</div>
         <div class="doc-sigblock-business">
@@ -3086,6 +3103,7 @@ function renderDocument(doc){
           ${webLine ? `<div>${webLine}</div>` : ''}
         </div>
       </div>`;
+    }
   }
 
   // stamp (legacy text-stamp — hidden on studio via CSS)
@@ -3203,8 +3221,84 @@ function bindForm(){
   f('saveBtn').onclick = () => saveCurrent();
   f('sendBtn').onclick = openSendModal;
   f('printBtn').onclick = () => window.print();
+  f('exportPdfBtn').onclick = () => exportPDF();
   f('saveClientBtn').onclick = saveCurrentClientToList;
   f('convertToInvoiceBtn').onclick = convertCurrentToInvoice;
+}
+
+// Export the current document as a PDF file. Uses html2pdf.js (loaded from CDN).
+// The rendered output is the same node the user sees in the preview pane, so
+// what you see in the editor is what you get in the file.
+// Returns a Promise that resolves to a Blob (used by the Send flow to attach).
+async function exportPDF({ silent = false } = {}){
+  if (typeof window.html2pdf === 'undefined'){
+    if (!silent) toast('PDF library still loading — try again in a moment');
+    return null;
+  }
+  if (!current){
+    if (!silent) toast('Open a document first');
+    return null;
+  }
+  const filename = (current.number || 'document') + '.pdf';
+  // Clone the document node so we can render it at print scale without
+  // affecting the on-screen preview. Wrap in a fixed-width A4-sized container
+  // so html2pdf renders at A4 dimensions even though the preview pane is narrower.
+  const source = document.getElementById('document');
+  if (!source){
+    if (!silent) toast('Nothing to export');
+    return null;
+  }
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = 'position:fixed;left:-99999px;top:0;width:794px;background:#fff;';
+  // Clone the document node so we render at A4 width without affecting
+  // the on-screen preview. Use the same classes the preview uses so styling
+  // (including the studio full-bleed header) renders identically.
+  // We intentionally DON'T add wrapper padding — each layout controls its
+  // own internal spacing via its CSS, so studio's yellow header reaches the
+  // page edge, while editorial/modern/classic keep their normal margins.
+  const clone = source.cloneNode(true);
+  clone.style.cssText = 'width:794px;background:#fff;box-shadow:none;border:none;border-radius:0;margin:0;';
+  // Layout-specific edge handling: editorial/modern/classic need internal
+  // padding so their content doesn't hit the paper edge; studio handles
+  // its own padding via class CSS and we leave it alone.
+  if (!clone.classList.contains('doc-style-studio')){
+    clone.style.padding = '48px 56px';
+  } else {
+    // Studio: zero outer padding so yellow header bleeds to the very edge.
+    // (The class CSS already sets padding-top/left/right:0 for studio.)
+    clone.style.padding = '0';
+  }
+  wrapper.appendChild(clone);
+  document.body.appendChild(wrapper);
+
+  try{
+    const opt = {
+      margin:       0,
+      filename:     filename,
+      image:        { type:'jpeg', quality:0.95 },
+      html2canvas:  { scale:2, useCORS:true, letterRendering:true, backgroundColor:'#ffffff', windowWidth:794 },
+      jsPDF:        { unit:'mm', format:'a4', orientation:'portrait' },
+      pagebreak:    { mode:['css','legacy'], avoid:['tr', '.doc-totals-row.grand', '.doc-sigblock'] }
+    };
+
+    if (silent){
+      // For Send: produce blob, don't trigger a download dialog
+      const blob = await window.html2pdf().set(opt).from(clone).outputPdf('blob');
+      document.body.removeChild(wrapper);
+      return blob;
+    } else {
+      // For Export button: download directly
+      await window.html2pdf().set(opt).from(clone).save();
+      document.body.removeChild(wrapper);
+      toast('PDF downloaded');
+      return null;
+    }
+  } catch (e){
+    console.error('PDF export failed:', e);
+    if (wrapper.parentNode) document.body.removeChild(wrapper);
+    if (!silent) toast('PDF export failed: ' + (e.message || e));
+    return null;
+  }
 }
 
 function fillForm(){
@@ -3512,13 +3606,37 @@ function downloadAttachments(){
   toast(`Downloading ${current.attachments.length} file${current.attachments.length>1?'s':''}…`);
 }
 
-function doSend(){
+async function doSend(){
   const to = document.getElementById('sm-to').value.trim();
   const cc = document.getElementById('sm-cc').value.trim();
   const sub = document.getElementById('sm-subject').value;
-  const body = document.getElementById('sm-body').value;
+  let body = document.getElementById('sm-body').value;
   const via = document.getElementById('sm-via').value;
   if (!to){ toast('Recipient email required'); return; }
+
+  // First, download the PDF. Browsers don't allow attaching files to mailto:
+  // or Gmail web compose URLs, so the next best thing is dropping the PDF in
+  // the user's Downloads folder so they can attach it manually with one click.
+  // We append a note to the email body so the recipient knows it's coming.
+  const sendBtnEl = document.getElementById('sm-go');
+  const origText = sendBtnEl ? sendBtnEl.textContent : '';
+  if (sendBtnEl){ sendBtnEl.disabled = true; sendBtnEl.textContent = 'Preparing PDF…'; }
+
+  try {
+    await exportPDF({ silent: false });   // triggers a download, shows toast
+  } catch (e){
+    console.warn('PDF download in Send flow failed:', e);
+    // Continue anyway — better to compose with no attachment than abort entirely.
+  } finally {
+    if (sendBtnEl){ sendBtnEl.disabled = false; sendBtnEl.textContent = origText; }
+  }
+
+  // Append a one-line note to the email body letting the recipient know the PDF
+  // was just downloaded. Only add it if the body doesn't already mention "attach".
+  if (!/attach/i.test(body)){
+    body = body.trimEnd()
+      + '\n\n— PDF attached separately (please find it in your Downloads folder if you don\'t see it yet) —';
+  }
 
   openMailComposer({ to, cc, subject:sub, body, via });
 
@@ -3528,7 +3646,7 @@ function doSend(){
   saveCurrent({ silent:true });
   fillForm();
   document.getElementById('sendModalBg').classList.remove('open');
-  toast('Composing email…');
+  toast('PDF downloaded · composing email');
 }
 
 // Detect mobile devices where Gmail web URL gets hijacked by the Gmail app
@@ -3677,7 +3795,7 @@ function renderClients(){
         <button class="btn btn-sm btn-danger" data-id="${c.id}" data-act="del-client" title="Delete">×</button>
       </div>
       <div class="client-card-name">${esc(c.name)}</div>
-      ${c.contact ? `<div class="client-card-contact">Attn: ${esc(c.contact)}</div>` : ''}
+      ${c.contact ? `<div class="client-card-contact">${esc(c.contact)}</div>` : ''}
       ${(c.email||c.phone||c.website||c.address) ? `<div class="client-card-detail">
         ${c.email ? esc(c.email) : ''}
         ${c.phone ? (c.email?'<br>':'') + esc(c.phone) : ''}
