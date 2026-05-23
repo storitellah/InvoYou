@@ -20,7 +20,13 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300..800&family=Inter:wght@300..700&family=Fraunces:opsz,wght,SOFT@9..144,300..700,0..100&family=Playfair+Display:ital,wght@0,400..800;1,400..800&family=Cormorant+Garamond:ital,wght@0,400..700;1,400..700&family=Work+Sans:wght@300..700&family=EB+Garamond:ital,wght@0,400..700;1,400..700&family=Lato:wght@300..700&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Source+Sans+3:wght@300..700&family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300..700&family=Spectral:ital,wght@0,300..700;1,300..700&family=IBM+Plex+Sans:wght@300..600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" defer></script>
+<!-- PDF generation libraries: html2canvas for DOM→Canvas, jsPDF for Canvas→PDF.
+     We bypass html2pdf.js because our paged exporter needs direct control over
+     both libraries to assemble per-page headers/footers — html2pdf bundles
+     them but doesn't expose them as globals.
+     Versions are pinned to known-good releases. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <style>
 :root{
   /* InvoYou brand palette — Trust-led indigo with freelancer warmth */
@@ -1753,13 +1759,13 @@ input[type=file]{padding:6px;font-size:12px}
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M14 2L7 9M14 2L9 14l-2-5-5-2z"/></svg>
               Send
             </button>
-            <button class="btn" id="printBtn">
+            <button class="btn" id="printBtn" title="Download PDF for printing">
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M4 6V2h8v4M4 11H2v-4a1 1 0 011-1h10a1 1 0 011 1v4h-2M4 10h8v4H4z"/></svg>
-              Print / PDF
+              Print
             </button>
-            <button class="btn" id="exportPdfBtn">
+            <button class="btn" id="exportPdfBtn" title="Download PDF file">
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M8 1v10M4 7l4 4 4-4M2 13h12"/></svg>
-              Export
+              Export PDF
             </button>
           </div>
 
@@ -3246,26 +3252,19 @@ function bindForm(){
 
   f('saveBtn').onclick = () => saveCurrent();
   f('sendBtn').onclick = openSendModal;
-  f('printBtn').onclick = () => window.print();
+  f('printBtn').onclick = () => exportPDF();
   f('exportPdfBtn').onclick = () => exportPDF();
   f('saveClientBtn').onclick = saveCurrentClientToList;
   f('convertToInvoiceBtn').onclick = convertCurrentToInvoice;
 }
 
-// Wait until html2pdf and its dependencies are actually usable.
-// `defer` on the CDN script only delays load until after HTML parse, not
-// until the script has finished initializing — so we have to verify the
-// API surface exists before using it. Retries every 100ms up to ~5s.
+// Verify the PDF libraries are loaded. html2pdf.bundle includes both
+// html2canvas and jsPDF as globals (window.html2canvas, window.jspdf).
 async function ensureHtml2PdfReady(){
   for (let i = 0; i < 50; i++){
-    if (typeof window.html2pdf === 'function'){
-      // sanity check: must also have html2canvas + jspdf available internally
-      try {
-        const probe = window.html2pdf();
-        if (probe && typeof probe.set === 'function' && typeof probe.from === 'function'){
-          return true;
-        }
-      } catch (e){ /* keep retrying */ }
+    if (typeof window.html2canvas === 'function' &&
+        window.jspdf && typeof window.jspdf.jsPDF === 'function'){
+      return true;
     }
     await new Promise(r => setTimeout(r, 100));
   }
@@ -3279,34 +3278,69 @@ async function ensureFontsReady(){
   if (document.fonts && document.fonts.ready){
     try { await document.fonts.ready; } catch (e){ /* best effort */ }
   }
-  // small extra wait so the layout engine catches up
   await new Promise(r => setTimeout(r, 80));
 }
 
-// Export the current document as a PDF file using html2pdf.js.
-// The rendered output is a clone of the on-screen preview node, so what
-// you see in the editor is what you get in the file.
+// Render a single DOM element to a canvas at A4 width using html2canvas.
+// Returns the canvas, or null on failure.
+async function renderElementToCanvas(el, width){
+  return await window.html2canvas(el, {
+    scale: 2,
+    useCORS: true,
+    letterRendering: true,
+    backgroundColor: '#ffffff',
+    width: width,
+    windowWidth: width,
+    logging: false
+  });
+}
+
+// Build a clone of the document positioned at viewport origin so html2canvas
+// can read valid layout coordinates. Returns { host, clone } — caller is
+// responsible for removing the host from DOM after capture.
+function createRenderHost(sourceEl, width){
+  const host = document.createElement('div');
+  host.id = 'pdfRenderHost';
+  host.style.cssText = [
+    'position:fixed',
+    'top:0','left:0',
+    'z-index:-1',                  // behind everything else
+    'width:' + width + 'px',
+    'background:#ffffff',
+    'pointer-events:none',
+    'opacity:1',
+    'overflow:visible'
+  ].join(';');
+  const clone = sourceEl.cloneNode(true);
+  const isStudio = clone.classList.contains('doc-style-studio');
+  clone.style.cssText = [
+    'width:' + width + 'px',
+    'box-sizing:border-box',
+    'background:#ffffff',
+    'box-shadow:none','border:none','border-radius:0','margin:0',
+    isStudio ? 'padding:0' : 'padding:48px 56px'
+  ].join(';');
+  host.appendChild(clone);
+  document.body.appendChild(host);
+  return { host, clone, isStudio };
+}
+
+// Export the current document as a multi-page PDF with header on EVERY page
+// and footer on the LAST page only.
 //
-// Key design choices that make this deterministic (instead of the prior
-// flaky behavior — same click sometimes blank, sometimes cropped, sometimes
-// correct):
-//
-//   1. We render the clone INSIDE THE VIEWPORT (top:0, left:0) but hidden
-//      under a white overlay, instead of off-screen at left:-99999px.
-//      html2canvas computes element positions via getBoundingClientRect,
-//      which returns broken values for elements positioned millions of
-//      pixels off-canvas — that's the source of the "right-side-only
-//      crop" failures you were seeing.
-//
-//   2. We pass EXPLICIT width/height/x/y/scrollX/scrollY to html2canvas
-//      so the capture region is locked. No "html2canvas guessing" path.
-//
-//   3. We await `document.fonts.ready` so custom fonts are loaded before
-//      capture. Without this you can get a render where the layout was
-//      computed with a fallback font and the columns reflow mid-capture.
-//
-//   4. We disable the Export button during rendering so the user can't
-//      fire two captures in parallel.
+// Strategy:
+//   1. Clone the on-screen document into an off-canvas A4-width host.
+//   2. Separate the document into THREE rendered regions:
+//        - HEADER:  yellow band (.doc-head) — captured once, repeated on every page
+//        - BODY:    everything between header and footer (bill-to, items table,
+//                   totals, notes/footer block)
+//        - FOOTER:  signature/contact block (.doc-sigblock) — captured once,
+//                   appears at the bottom of the LAST page only
+//   3. Slice the BODY canvas into page-sized chunks, choosing slice points
+//      that fall on safe boundaries (between table rows, around the totals
+//      box, etc.) so we never split content mid-row.
+//   4. Assemble pages in jsPDF: header → body slice → (footer if last page)
+//      → page number ("Page X of Y").
 async function exportPDF({ silent = false } = {}){
   if (!current){
     if (!silent) toast('Open a document first');
@@ -3318,7 +3352,7 @@ async function exportPDF({ silent = false } = {}){
     return null;
   }
 
-  // Lock the export buttons until we're done
+  // Lock buttons during render
   const exportBtnEl = document.getElementById('exportPdfBtn');
   const printBtnEl  = document.getElementById('printBtn');
   const origExportText = exportBtnEl ? exportBtnEl.textContent.trim() : '';
@@ -3328,7 +3362,6 @@ async function exportPDF({ silent = false } = {}){
   }
   if (printBtnEl && !silent) printBtnEl.disabled = true;
 
-  // 1) Verify html2pdf is loaded and ready
   const ready = await ensureHtml2PdfReady();
   if (!ready){
     if (!silent) toast('PDF library failed to load — check your connection');
@@ -3337,114 +3370,237 @@ async function exportPDF({ silent = false } = {}){
     return null;
   }
 
-  // 2) Wait for fonts to be ready so the capture uses the right typefaces
   await ensureFontsReady();
 
-  // 3) Build a render container positioned at viewport origin but hidden
-  //    under a white overlay. html2canvas reads getBoundingClientRect which
-  //    needs the element to be in-flow with valid coordinates.
-  const renderHost = document.createElement('div');
-  renderHost.id = 'pdfRenderHost';
-  renderHost.style.cssText = [
-    'position:fixed',
-    'top:0',
-    'left:0',
-    'z-index:-1',           // behind everything else; user can't see it
-    'width:794px',          // A4 width in px at 96dpi
-    'background:#ffffff',
-    'pointer-events:none',
-    'opacity:1',            // must be visible to html2canvas; user sees overlay
-    'overflow:visible'
-  ].join(';');
+  // A4 dimensions
+  const A4_WIDTH_PX  = 794;       // 210mm @ 96dpi
+  const A4_HEIGHT_PX = 1123;      // 297mm @ 96dpi
+  const A4_WIDTH_MM  = 210;
+  const A4_HEIGHT_MM = 297;
 
-  const clone = source.cloneNode(true);
-  // Force layout-appropriate sizing. Width must be exactly 794px so the
-  // resulting PDF is A4. Box-sizing must be border-box so padding sits
-  // INSIDE the 794px (not added on top, which would make the canvas wider).
-  const isStudio = clone.classList.contains('doc-style-studio');
-  clone.style.cssText = [
-    'width:794px',
-    'box-sizing:border-box',
-    'background:#ffffff',
-    'box-shadow:none',
-    'border:none',
-    'border-radius:0',
-    'margin:0',
-    // Studio handles its own internal padding via class CSS (it sets
-    // padding-top/left/right:0 to allow the yellow header bleed). For
-    // other layouts, give the document breathing room inside the page.
-    isStudio ? 'padding:0' : 'padding:48px 56px'
-  ].join(';');
+  const { host, clone, isStudio } = createRenderHost(source, A4_WIDTH_PX);
 
-  renderHost.appendChild(clone);
-  document.body.appendChild(renderHost);
-
-  // 4) Wait one frame so the browser computes layout on the new element
-  //    before we measure it. (Two RAFs is more reliable than one — the
-  //    first triggers style recalc, the second guarantees layout.)
+  // Wait two frames so layout is computed
   await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
-  // 5) Measure the exact rendered size so we can lock html2canvas to it.
-  //    Without explicit dimensions, html2canvas guesses based on the
-  //    viewport, which can produce a capture region that misses the right
-  //    half of the document (the bug in your previous PDFs).
-  const rect = clone.getBoundingClientRect();
-  const renderWidth  = Math.ceil(rect.width)  || 794;
-  const renderHeight = Math.ceil(rect.height) || 1123;
+  // Find header & footer elements in the clone
+  const headerEl = clone.querySelector('.doc-head');
+  const footerEl = clone.querySelector('.doc-sigblock');
 
-  const filename = (current.number || 'document') + '.pdf';
+  // Build the BODY element by cloning the document and removing header+footer.
+  // We keep this as a separate cloned node so we can capture it cleanly.
+  // For non-studio layouts we keep the document padding around the body.
+  const bodyHost = document.createElement('div');
+  bodyHost.style.cssText = [
+    'position:fixed','top:0','left:0','z-index:-1',
+    'width:' + A4_WIDTH_PX + 'px',
+    'background:#ffffff','pointer-events:none','opacity:1','overflow:visible'
+  ].join(';');
+  const bodyClone = source.cloneNode(true);
+  bodyClone.style.cssText = [
+    'width:' + A4_WIDTH_PX + 'px',
+    'box-sizing:border-box',
+    'background:#ffffff',
+    'box-shadow:none','border:none','border-radius:0','margin:0',
+    isStudio ? 'padding:0' : 'padding:48px 56px'
+  ].join(';');
+  // strip header & footer from the body clone so we render JUST the middle
+  const bcHead = bodyClone.querySelector('.doc-head');
+  if (bcHead) bcHead.remove();
+  const bcFoot = bodyClone.querySelector('.doc-sigblock');
+  if (bcFoot) bcFoot.remove();
+  // Add some top padding inside the body clone for studio (so body content
+  // doesn't hug the page edge after we remove the header). Studio uses 36px
+  // top margin on .doc-head — we replicate equivalent breathing room.
+  if (isStudio){
+    bodyClone.style.padding = '24px 46px 0';
+  }
+  bodyHost.appendChild(bodyClone);
+  document.body.appendChild(bodyHost);
+
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+  // Compute safe page-break Y positions from the rendered body. These are
+  // pixel offsets from the top of bodyClone where it's safe to cut a page:
+  //   - the END of each <tr> (so we slice between rows, never through one)
+  //   - the END of .doc-totals (so totals stay together)
+  //   - the END of .doc-footer (so notes/terms stay whole)
+  // We capture the bodyClone's own getBoundingClientRect as our origin,
+  // then for each safe element compute (its bottom) - (bodyClone top).
+  const bodyRect = bodyClone.getBoundingClientRect();
+  const safeYs = [];
+  bodyClone.querySelectorAll('.doc-items tbody tr, .doc-totals, .doc-footer > *').forEach(el => {
+    const r = el.getBoundingClientRect();
+    const yBottom = r.bottom - bodyRect.top;
+    if (yBottom > 0) safeYs.push(yBottom);
+  });
+  // Always include the very bottom as a safe end point
+  safeYs.push(bodyRect.height);
+  safeYs.sort((a, b) => a - b);
 
   try {
-    const opt = {
-      margin:    0,
-      filename:  filename,
-      image:     { type:'jpeg', quality:0.95 },
-      html2canvas: {
-        scale:           2,
-        useCORS:         true,
-        letterRendering: true,
-        backgroundColor: '#ffffff',
-        // EXPLICIT capture region — this is the critical fix. By telling
-        // html2canvas exactly where the element is and how big it is, we
-        // remove the heuristic that was choosing the wrong region.
-        x:           0,
-        y:           0,
-        scrollX:     0,
-        scrollY:     0,
-        width:       renderWidth,
-        height:      renderHeight,
-        windowWidth: renderWidth,
-        // Lock the rendering window to the clone's height so we don't
-        // capture page chrome below the document.
-        windowHeight: renderHeight
-      },
-      jsPDF:     { unit:'mm', format:'a4', orientation:'portrait', compress:true },
-      pagebreak: {
-        mode:  ['css','legacy'],
-        avoid: ['tr', '.doc-totals-row.grand', '.doc-sigblock', '.doc-footer']
+    // ---- 1) Capture header (once) ----
+    let headerCanvas = null;
+    let headerHeightPx = 0;
+    if (headerEl){
+      headerCanvas = await renderElementToCanvas(headerEl, A4_WIDTH_PX);
+      headerHeightPx = headerCanvas.height / 2;  // canvas is 2x for scale=2
+    }
+
+    // ---- 2) Capture body (full height, one tall canvas) ----
+    const bodyCanvas = await renderElementToCanvas(bodyClone, A4_WIDTH_PX);
+    const bodyHeightPx = bodyCanvas.height / 2;
+    const bodyWidthPx  = bodyCanvas.width  / 2;
+
+    // ---- 3) Capture footer (once) ----
+    let footerCanvas = null;
+    let footerHeightPx = 0;
+    if (footerEl){
+      footerCanvas = await renderElementToCanvas(footerEl, A4_WIDTH_PX);
+      footerHeightPx = footerCanvas.height / 2;
+    }
+
+    // ---- 4) Plan pages ----
+    // Available height for body content on each page = A4 height - header height.
+    // On the LAST page, we ALSO subtract footer height + a 20px gap.
+    // We work in CSS pixels (96dpi) here; jsPDF will convert to mm.
+    const BODY_AVAIL_NON_LAST = A4_HEIGHT_PX - headerHeightPx;
+    const FOOTER_GAP = 24;
+    const BODY_AVAIL_LAST     = A4_HEIGHT_PX - headerHeightPx - footerHeightPx - FOOTER_GAP;
+    const PAGE_NUMBER_RESERVE = 28;   // bottom margin reserved for "Page X of Y"
+
+    // Walk through the body, deciding where each page ends.
+    // For each page we want maxBodyY such that maxBodyY <= cursor + avail.
+    // Then snap maxBodyY to the nearest safe Y at or below that limit.
+    const pageRanges = [];      // {from, to} in body-canvas pixel space
+    let cursor = 0;
+    const totalBodyHeight = bodyHeightPx;
+
+    // SAFEGUARD: never produce more than 50 pages — bail out as a single
+    // unsliced page if something pathological happens.
+    const HARD_LIMIT = 50;
+    while (cursor < totalBodyHeight && pageRanges.length < HARD_LIMIT){
+      // Tentatively assume this is NOT the last page
+      const limitNonLast = cursor + (BODY_AVAIL_NON_LAST - PAGE_NUMBER_RESERVE);
+      // Does the remaining body fit on this single page WITH the footer?
+      const remaining = totalBodyHeight - cursor;
+      const isLast = (remaining <= (BODY_AVAIL_LAST - PAGE_NUMBER_RESERVE));
+      const limit = isLast
+        ? cursor + remaining
+        : limitNonLast;
+
+      // Find the largest safe Y that's <= limit and > cursor.
+      let chosenY = limit;
+      if (!isLast){
+        // Pick the largest safeY in (cursor, limit].
+        let best = -1;
+        for (const y of safeYs){
+          if (y > cursor && y <= limit) best = y;
+          if (y > limit) break;
+        }
+        // If we found no safe break point (e.g., a single oversized row),
+        // just hard-cut at limit — better than infinite loop.
+        chosenY = best > cursor ? best : limit;
       }
-    };
+
+      // Tiny safety: ensure we always advance by at least 100px so we
+      // can't loop forever on a degenerate row.
+      if (chosenY - cursor < 100) chosenY = Math.min(cursor + Math.max(100, limit - cursor), totalBodyHeight);
+
+      pageRanges.push({ from: cursor, to: chosenY, isLast });
+      cursor = chosenY;
+    }
+
+    // If the loop ended without flagging a page as last, mark the final one.
+    if (pageRanges.length && !pageRanges[pageRanges.length - 1].isLast){
+      pageRanges[pageRanges.length - 1].isLast = true;
+    }
+
+    // ---- 5) Assemble jsPDF document ----
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ unit:'mm', format:'a4', orientation:'portrait', compress:true });
+    const PX_PER_MM = A4_WIDTH_PX / A4_WIDTH_MM;   // 794/210 ≈ 3.78
+
+    const pxToMm = (px) => px / PX_PER_MM;
+
+    for (let i = 0; i < pageRanges.length; i++){
+      const pageNum = i + 1;
+      const totalPages = pageRanges.length;
+      const { from, to, isLast } = pageRanges[i];
+      if (i > 0) pdf.addPage();
+
+      // Draw header at top
+      let yOffsetMm = 0;
+      if (headerCanvas){
+        const headerImg = headerCanvas.toDataURL('image/jpeg', 0.95);
+        const headerHmm = pxToMm(headerHeightPx);
+        pdf.addImage(headerImg, 'JPEG', 0, 0, A4_WIDTH_MM, headerHmm);
+        yOffsetMm = headerHmm;
+      }
+
+      // Slice the body canvas vertically into the page's range and draw it.
+      // bodyCanvas is at 2x scale, so we operate on doubled coordinates internally
+      // but output in CSS px (then convert to mm).
+      const sliceFromPx = from;
+      const sliceToPx   = to;
+      const sliceHeightPx = sliceToPx - sliceFromPx;
+      if (sliceHeightPx > 0){
+        // Make a temporary canvas at the slice's dimensions and draw the
+        // corresponding portion of the body canvas into it.
+        const tmp = document.createElement('canvas');
+        tmp.width  = bodyCanvas.width;             // full A4 width at 2x
+        tmp.height = Math.ceil(sliceHeightPx * 2); // height in canvas pixels (2x)
+        const ctx = tmp.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, tmp.width, tmp.height);
+        // drawImage(source, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight)
+        ctx.drawImage(
+          bodyCanvas,
+          0, sliceFromPx * 2,                  // source x, y in canvas px
+          bodyCanvas.width, sliceHeightPx * 2, // source w, h
+          0, 0,                                // dest x, y
+          tmp.width, tmp.height                // dest w, h
+        );
+        const sliceImg = tmp.toDataURL('image/jpeg', 0.95);
+        const sliceWmm = A4_WIDTH_MM;
+        const sliceHmm = pxToMm(sliceHeightPx);
+        pdf.addImage(sliceImg, 'JPEG', 0, yOffsetMm, sliceWmm, sliceHmm);
+      }
+
+      // Footer on the LAST page only, pinned to the bottom
+      if (isLast && footerCanvas){
+        const footerHmm = pxToMm(footerHeightPx);
+        const footerYmm = A4_HEIGHT_MM - footerHmm - pxToMm(PAGE_NUMBER_RESERVE);
+        const footerImg = footerCanvas.toDataURL('image/jpeg', 0.95);
+        pdf.addImage(footerImg, 'JPEG', 0, footerYmm, A4_WIDTH_MM, footerHmm);
+      }
+
+      // Page number "Page X of Y" centered at the bottom
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(9);
+      pdf.setTextColor(107, 107, 112);
+      const pageLabel = 'Page ' + pageNum + ' of ' + totalPages;
+      pdf.text(pageLabel, A4_WIDTH_MM / 2, A4_HEIGHT_MM - 8, { align:'center' });
+    }
+
+    const filename = (current.number || 'document') + '.pdf';
 
     let result = null;
     if (silent){
-      // For the Send flow: produce a Blob, don't trigger a download dialog.
-      // Note: browsers can't attach Blobs to mailto: or Gmail compose URLs,
-      // so the Send flow uses .save() (download) instead — kept here for
-      // API completeness in case future integrations can use a Blob.
-      result = await window.html2pdf().set(opt).from(clone).outputPdf('blob');
+      result = pdf.output('blob');
     } else {
-      // For Export button: trigger a real file download
-      await window.html2pdf().set(opt).from(clone).save();
+      pdf.save(filename);
       toast('PDF downloaded');
     }
     return result;
+
   } catch (e){
     console.error('PDF export failed:', e);
     if (!silent) toast('PDF export failed: ' + (e.message || e));
     return null;
   } finally {
-    // ALWAYS clean up the render host and re-enable buttons, even on error.
-    if (renderHost.parentNode) document.body.removeChild(renderHost);
+    if (host.parentNode) document.body.removeChild(host);
+    if (bodyHost.parentNode) document.body.removeChild(bodyHost);
     if (exportBtnEl && !silent){
       exportBtnEl.disabled = false;
       exportBtnEl.textContent = origExportText;
