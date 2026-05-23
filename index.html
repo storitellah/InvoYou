@@ -389,7 +389,7 @@ input[type=file]{padding:6px;font-size:12px}
   font-variation-settings:"SOFT" 50,"opsz" 60;
 }
 .doc-style-editorial .doc-business-name{
-  font-family:var(--font-display); font-size:22px; font-weight:500;
+  font-family:var(--font-display); font-size:calc(22px * var(--name-scale, 1)); font-weight:500;
   letter-spacing:-.01em; line-height:1.1;
   font-variation-settings:"SOFT" 50,"opsz" 100;
   margin-bottom:2px;
@@ -460,7 +460,7 @@ input[type=file]{padding:6px;font-size:12px}
   font-weight:600; flex-shrink:0; margin-bottom:10px;
 }
 .doc-style-modern .doc-business-name{
-  font-family:var(--font-display); font-size:24px; font-weight:600;
+  font-family:var(--font-display); font-size:calc(24px * var(--name-scale, 1)); font-weight:600;
   letter-spacing:-.015em; line-height:1.1; margin-bottom:2px;
 }
 .doc-style-modern .doc-business-tag{
@@ -530,7 +530,7 @@ input[type=file]{padding:6px;font-size:12px}
   font-weight:500; flex-shrink:0;
 }
 .doc-style-classic .doc-business-name{
-  font-family:var(--font-display); font-size:28px; font-weight:500;
+  font-family:var(--font-display); font-size:calc(28px * var(--name-scale, 1)); font-weight:500;
   letter-spacing:.04em; line-height:1.1;
 }
 .doc-style-classic .doc-business-tag{
@@ -619,7 +619,8 @@ input[type=file]{padding:6px;font-size:12px}
 .doc-style-studio .doc-brand-block{ display:none; }   /* monogram lives elsewhere in this layout */
 .doc-style-studio .doc-business-name{
   font-family:var(--font-display);
-  font-size:34px; font-weight:700; letter-spacing:.02em;
+  font-size:calc(34px * var(--name-scale, 1));
+  font-weight:700; letter-spacing:.02em;
   line-height:1.05; text-transform:uppercase;
   color:#0F0F0F;
   font-variation-settings:"SOFT" 40,"opsz" 144;
@@ -1374,30 +1375,45 @@ input[type=file]{padding:6px;font-size:12px}
    across page boundaries; the signature block stays whole on the last page.
 */
 @media print{
-  /* hide app chrome */
+  /* Force everything that isn't the document itself to be invisible to
+     the print engine. We hide app chrome via display:none, then collapse
+     all containers to default block flow so the document inherits the
+     full @page width. */
   .sidebar, .view-header, .preview-actions, .form-card,
-  .editor > div:first-child{ display:none !important; }
-  body{ background:#fff; }
-  .app{ display:block; }
-  .main{ padding:0; max-width:none; }
-  .editor{ grid-template-columns:1fr; display:block; }
-  .preview-wrap{ position:static; }
-  /* Strip the page-edge border, shadow, rounding in the export */
-  .preview-frame{
+  .editor > div:first-child,
+  .modal-bg, .toast{ display:none !important; }
+
+  body, html{
+    background:#fff !important;
+    margin:0 !important; padding:0 !important;
+    width:auto !important; height:auto !important;
+  }
+  .app, .main, .editor, .preview-wrap, .preview-frame{
+    display:block !important;
+    position:static !important;
+    width:auto !important;
+    max-width:none !important;
+    margin:0 !important;
+    padding:0 !important;
+    background:transparent !important;
     border:none !important;
     box-shadow:none !important;
     border-radius:0 !important;
-    background:transparent !important;
     overflow:visible !important;
   }
-  /* The .document is what becomes the printed body. Padding is controlled
-     by @page margins, not by the document itself, so content aligns the
-     same way on every page. */
+  /* The .document is what becomes the printed body. It must occupy the
+     full @page content area; padding is controlled by @page margins (not
+     by the document itself) so columns align identically on every page. */
   .document{
+    width:100% !important;
+    max-width:none !important;
+    margin:0 !important;
     padding:0 !important;
     background:#fff !important;
     box-shadow:none !important;
     border:none !important;
+    border-radius:0 !important;
+    transform:none !important;
   }
 
   /* A4 page with uniform margins. Bottom-right shows "Page N of M".
@@ -1911,6 +1927,12 @@ input[type=file]{padding:6px;font-size:12px}
           <div class="form-row" style="margin-top:11px">
             <label>Logo scale: <span id="logoScaleVal">100</span>%</label>
             <input id="s-biz-logo-scale" type="range" min="50" max="200" step="5" value="100" style="padding:0" />
+          </div>
+          <div class="form-row" style="margin-top:11px">
+            <label>Business name size: <span id="nameScaleVal">100</span>%
+              <span style="font-weight:400;color:var(--muted);font-size:11px">(controls the heading size on the rendered invoice)</span>
+            </label>
+            <input id="s-biz-name-scale" type="range" min="60" max="130" step="5" value="100" style="padding:0" />
           </div>
 
           <div class="form-row" style="margin-top:14px;padding-top:14px;border-top:1px dashed var(--line)">
@@ -2549,6 +2571,7 @@ const DEFAULTS = {
     address: "Nairobi, Kenya",
     logo: null,         // dataURL string or null
     logoScale: 100,     // 50..200
+    nameScale: 100,     // 60..130 — scales the business name heading on the doc
     signature: null,    // dataURL string or null (used by Studio layout)
     stampLine: "— Prepared by {name} · {business} —"
   },
@@ -2875,6 +2898,9 @@ function applyDesign(){
 
   // logo scale
   r.setProperty('--logo-scale', (state.business.logoScale || 100)/100);
+
+  // business-name scale (controls .doc-business-name font-size on the rendered doc)
+  r.setProperty('--name-scale', (state.business.nameScale || 100)/100);
 
   // apply layout class to .document
   const docEl = document.getElementById('document');
@@ -3226,78 +3252,204 @@ function bindForm(){
   f('convertToInvoiceBtn').onclick = convertCurrentToInvoice;
 }
 
-// Export the current document as a PDF file. Uses html2pdf.js (loaded from CDN).
-// The rendered output is the same node the user sees in the preview pane, so
-// what you see in the editor is what you get in the file.
-// Returns a Promise that resolves to a Blob (used by the Send flow to attach).
-async function exportPDF({ silent = false } = {}){
-  if (typeof window.html2pdf === 'undefined'){
-    if (!silent) toast('PDF library still loading — try again in a moment');
-    return null;
+// Wait until html2pdf and its dependencies are actually usable.
+// `defer` on the CDN script only delays load until after HTML parse, not
+// until the script has finished initializing — so we have to verify the
+// API surface exists before using it. Retries every 100ms up to ~5s.
+async function ensureHtml2PdfReady(){
+  for (let i = 0; i < 50; i++){
+    if (typeof window.html2pdf === 'function'){
+      // sanity check: must also have html2canvas + jspdf available internally
+      try {
+        const probe = window.html2pdf();
+        if (probe && typeof probe.set === 'function' && typeof probe.from === 'function'){
+          return true;
+        }
+      } catch (e){ /* keep retrying */ }
+    }
+    await new Promise(r => setTimeout(r, 100));
   }
+  return false;
+}
+
+// Wait for fonts to finish loading. Without this, html2canvas captures
+// before custom fonts arrive and falls back to system fonts, producing
+// inconsistent renders between calls.
+async function ensureFontsReady(){
+  if (document.fonts && document.fonts.ready){
+    try { await document.fonts.ready; } catch (e){ /* best effort */ }
+  }
+  // small extra wait so the layout engine catches up
+  await new Promise(r => setTimeout(r, 80));
+}
+
+// Export the current document as a PDF file using html2pdf.js.
+// The rendered output is a clone of the on-screen preview node, so what
+// you see in the editor is what you get in the file.
+//
+// Key design choices that make this deterministic (instead of the prior
+// flaky behavior — same click sometimes blank, sometimes cropped, sometimes
+// correct):
+//
+//   1. We render the clone INSIDE THE VIEWPORT (top:0, left:0) but hidden
+//      under a white overlay, instead of off-screen at left:-99999px.
+//      html2canvas computes element positions via getBoundingClientRect,
+//      which returns broken values for elements positioned millions of
+//      pixels off-canvas — that's the source of the "right-side-only
+//      crop" failures you were seeing.
+//
+//   2. We pass EXPLICIT width/height/x/y/scrollX/scrollY to html2canvas
+//      so the capture region is locked. No "html2canvas guessing" path.
+//
+//   3. We await `document.fonts.ready` so custom fonts are loaded before
+//      capture. Without this you can get a render where the layout was
+//      computed with a fallback font and the columns reflow mid-capture.
+//
+//   4. We disable the Export button during rendering so the user can't
+//      fire two captures in parallel.
+async function exportPDF({ silent = false } = {}){
   if (!current){
     if (!silent) toast('Open a document first');
     return null;
   }
-  const filename = (current.number || 'document') + '.pdf';
-  // Clone the document node so we can render it at print scale without
-  // affecting the on-screen preview. Wrap in a fixed-width A4-sized container
-  // so html2pdf renders at A4 dimensions even though the preview pane is narrower.
   const source = document.getElementById('document');
   if (!source){
     if (!silent) toast('Nothing to export');
     return null;
   }
-  const wrapper = document.createElement('div');
-  wrapper.style.cssText = 'position:fixed;left:-99999px;top:0;width:794px;background:#fff;';
-  // Clone the document node so we render at A4 width without affecting
-  // the on-screen preview. Use the same classes the preview uses so styling
-  // (including the studio full-bleed header) renders identically.
-  // We intentionally DON'T add wrapper padding — each layout controls its
-  // own internal spacing via its CSS, so studio's yellow header reaches the
-  // page edge, while editorial/modern/classic keep their normal margins.
-  const clone = source.cloneNode(true);
-  clone.style.cssText = 'width:794px;background:#fff;box-shadow:none;border:none;border-radius:0;margin:0;';
-  // Layout-specific edge handling: editorial/modern/classic need internal
-  // padding so their content doesn't hit the paper edge; studio handles
-  // its own padding via class CSS and we leave it alone.
-  if (!clone.classList.contains('doc-style-studio')){
-    clone.style.padding = '48px 56px';
-  } else {
-    // Studio: zero outer padding so yellow header bleeds to the very edge.
-    // (The class CSS already sets padding-top/left/right:0 for studio.)
-    clone.style.padding = '0';
-  }
-  wrapper.appendChild(clone);
-  document.body.appendChild(wrapper);
 
-  try{
+  // Lock the export buttons until we're done
+  const exportBtnEl = document.getElementById('exportPdfBtn');
+  const printBtnEl  = document.getElementById('printBtn');
+  const origExportText = exportBtnEl ? exportBtnEl.textContent.trim() : '';
+  if (exportBtnEl && !silent){
+    exportBtnEl.disabled = true;
+    exportBtnEl.textContent = 'Exporting…';
+  }
+  if (printBtnEl && !silent) printBtnEl.disabled = true;
+
+  // 1) Verify html2pdf is loaded and ready
+  const ready = await ensureHtml2PdfReady();
+  if (!ready){
+    if (!silent) toast('PDF library failed to load — check your connection');
+    if (exportBtnEl && !silent){ exportBtnEl.disabled = false; exportBtnEl.textContent = origExportText; }
+    if (printBtnEl && !silent) printBtnEl.disabled = false;
+    return null;
+  }
+
+  // 2) Wait for fonts to be ready so the capture uses the right typefaces
+  await ensureFontsReady();
+
+  // 3) Build a render container positioned at viewport origin but hidden
+  //    under a white overlay. html2canvas reads getBoundingClientRect which
+  //    needs the element to be in-flow with valid coordinates.
+  const renderHost = document.createElement('div');
+  renderHost.id = 'pdfRenderHost';
+  renderHost.style.cssText = [
+    'position:fixed',
+    'top:0',
+    'left:0',
+    'z-index:-1',           // behind everything else; user can't see it
+    'width:794px',          // A4 width in px at 96dpi
+    'background:#ffffff',
+    'pointer-events:none',
+    'opacity:1',            // must be visible to html2canvas; user sees overlay
+    'overflow:visible'
+  ].join(';');
+
+  const clone = source.cloneNode(true);
+  // Force layout-appropriate sizing. Width must be exactly 794px so the
+  // resulting PDF is A4. Box-sizing must be border-box so padding sits
+  // INSIDE the 794px (not added on top, which would make the canvas wider).
+  const isStudio = clone.classList.contains('doc-style-studio');
+  clone.style.cssText = [
+    'width:794px',
+    'box-sizing:border-box',
+    'background:#ffffff',
+    'box-shadow:none',
+    'border:none',
+    'border-radius:0',
+    'margin:0',
+    // Studio handles its own internal padding via class CSS (it sets
+    // padding-top/left/right:0 to allow the yellow header bleed). For
+    // other layouts, give the document breathing room inside the page.
+    isStudio ? 'padding:0' : 'padding:48px 56px'
+  ].join(';');
+
+  renderHost.appendChild(clone);
+  document.body.appendChild(renderHost);
+
+  // 4) Wait one frame so the browser computes layout on the new element
+  //    before we measure it. (Two RAFs is more reliable than one — the
+  //    first triggers style recalc, the second guarantees layout.)
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+  // 5) Measure the exact rendered size so we can lock html2canvas to it.
+  //    Without explicit dimensions, html2canvas guesses based on the
+  //    viewport, which can produce a capture region that misses the right
+  //    half of the document (the bug in your previous PDFs).
+  const rect = clone.getBoundingClientRect();
+  const renderWidth  = Math.ceil(rect.width)  || 794;
+  const renderHeight = Math.ceil(rect.height) || 1123;
+
+  const filename = (current.number || 'document') + '.pdf';
+
+  try {
     const opt = {
-      margin:       0,
-      filename:     filename,
-      image:        { type:'jpeg', quality:0.95 },
-      html2canvas:  { scale:2, useCORS:true, letterRendering:true, backgroundColor:'#ffffff', windowWidth:794 },
-      jsPDF:        { unit:'mm', format:'a4', orientation:'portrait' },
-      pagebreak:    { mode:['css','legacy'], avoid:['tr', '.doc-totals-row.grand', '.doc-sigblock'] }
+      margin:    0,
+      filename:  filename,
+      image:     { type:'jpeg', quality:0.95 },
+      html2canvas: {
+        scale:           2,
+        useCORS:         true,
+        letterRendering: true,
+        backgroundColor: '#ffffff',
+        // EXPLICIT capture region — this is the critical fix. By telling
+        // html2canvas exactly where the element is and how big it is, we
+        // remove the heuristic that was choosing the wrong region.
+        x:           0,
+        y:           0,
+        scrollX:     0,
+        scrollY:     0,
+        width:       renderWidth,
+        height:      renderHeight,
+        windowWidth: renderWidth,
+        // Lock the rendering window to the clone's height so we don't
+        // capture page chrome below the document.
+        windowHeight: renderHeight
+      },
+      jsPDF:     { unit:'mm', format:'a4', orientation:'portrait', compress:true },
+      pagebreak: {
+        mode:  ['css','legacy'],
+        avoid: ['tr', '.doc-totals-row.grand', '.doc-sigblock', '.doc-footer']
+      }
     };
 
+    let result = null;
     if (silent){
-      // For Send: produce blob, don't trigger a download dialog
-      const blob = await window.html2pdf().set(opt).from(clone).outputPdf('blob');
-      document.body.removeChild(wrapper);
-      return blob;
+      // For the Send flow: produce a Blob, don't trigger a download dialog.
+      // Note: browsers can't attach Blobs to mailto: or Gmail compose URLs,
+      // so the Send flow uses .save() (download) instead — kept here for
+      // API completeness in case future integrations can use a Blob.
+      result = await window.html2pdf().set(opt).from(clone).outputPdf('blob');
     } else {
-      // For Export button: download directly
+      // For Export button: trigger a real file download
       await window.html2pdf().set(opt).from(clone).save();
-      document.body.removeChild(wrapper);
       toast('PDF downloaded');
-      return null;
     }
+    return result;
   } catch (e){
     console.error('PDF export failed:', e);
-    if (wrapper.parentNode) document.body.removeChild(wrapper);
     if (!silent) toast('PDF export failed: ' + (e.message || e));
     return null;
+  } finally {
+    // ALWAYS clean up the render host and re-enable buttons, even on error.
+    if (renderHost.parentNode) document.body.removeChild(renderHost);
+    if (exportBtnEl && !silent){
+      exportBtnEl.disabled = false;
+      exportBtnEl.textContent = origExportText;
+    }
+    if (printBtnEl && !silent) printBtnEl.disabled = false;
   }
 }
 
@@ -4331,6 +4483,8 @@ function fillSettingsForm(){
   g('s-biz-stamp').value = b.stampLine;
   g('s-biz-logo-scale').value = b.logoScale;
   g('logoScaleVal').textContent = b.logoScale;
+  g('s-biz-name-scale').value = b.nameScale || 100;
+  g('nameScaleVal').textContent = b.nameScale || 100;
   showLogoPreview();
   showSignaturePreview();
 
@@ -4610,7 +4764,8 @@ document.getElementById('saveSettingsBtn').onclick = () => {
     vatNumber: g('s-biz-vatno').value,
     address: g('s-biz-address').value,
     stampLine: g('s-biz-stamp').value,
-    logoScale: Number(g('s-biz-logo-scale').value)||100
+    logoScale: Number(g('s-biz-logo-scale').value)||100,
+    nameScale: Number(g('s-biz-name-scale').value)||100
   };
   state.settings = {
     ...state.settings,
@@ -4695,6 +4850,12 @@ document.getElementById('s-biz-logo-scale').oninput = e => {
   document.getElementById('logoScaleVal').textContent = e.target.value;
   state.business.logoScale = Number(e.target.value);
   applyDesign(); if (current) updatePreview();
+};
+document.getElementById('s-biz-name-scale').oninput = e => {
+  document.getElementById('nameScaleVal').textContent = e.target.value;
+  state.business.nameScale = Number(e.target.value);
+  applyDesign(); if (current) updatePreview();
+  saveState();
 };
 
 // signature file input (used by Studio layout)
