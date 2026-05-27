@@ -575,8 +575,35 @@ input[type=file]{padding:6px;font-size:12px}
 .doc-style-modern .doc-totals-row.grand .lbl{color:#fff}
 
 /* ----- STYLE: CLASSIC ----- */
-.doc-style-classic{ border:1px solid var(--doc-ink); /* inherits 96px padding from .document */ }
-.doc-style-classic .doc-head{ text-align:center; padding-bottom:24px; border-bottom:3px double var(--doc-ink); margin-bottom:28px; }
+/* ----- STYLE: CLASSIC (formal, centered header, minimal lines) -----
+   This revision strips ALL black divider lines (no outer border, no double
+   rules below header or grand total, no borders around bill-to, no top/bottom
+   borders on table headers, no row dividers in the items table). Structure
+   is conveyed by whitespace, typography weight, and uppercase letter-spacing
+   alone — a clean accounting-document aesthetic.
+
+   What stays:
+     • Centered business + INVOICE title
+     • Monogram with a thin circular outline (the only retained visual frame —
+       it's part of the brand mark, not a structural divider)
+     • Bold "Description / Qty / Unit / Rate / Amount" column headers with
+       letter-spacing for hierarchy
+     • Bold grand total at the foot of the totals area, set apart by spacing
+   What's gone:
+     • .doc-style-classic outer 1px border
+     • 3px double rule below header
+     • dotted rule above dates
+     • borders on .doc-billto (top + bottom)
+     • 1.5px solid rules around .doc-items th (above and below)
+     • 1px row separators in .doc-items td
+     • 1.5px solid + 3px double rules on grand-total row
+*/
+.doc-style-classic{ /* inherits 96px (1in) padding from .document; no outer border */ }
+.doc-style-classic .doc-head{
+  text-align:center;
+  padding-bottom:0;
+  margin-bottom:36px;
+}
 .doc-style-classic .doc-brand{
   display:flex; justify-content:center; align-items:center;
   gap:14px; margin-bottom:14px;
@@ -601,7 +628,7 @@ input[type=file]{padding:6px;font-size:12px}
 }
 .doc-style-classic .doc-type{
   font-family:var(--font-display); font-size:26px; font-weight:500;
-  letter-spacing:.18em; text-transform:uppercase; margin-top:18px;
+  letter-spacing:.18em; text-transform:uppercase; margin-top:22px;
 }
 .doc-style-classic .doc-type em{font-style:normal}
 .doc-style-classic .doc-number{
@@ -609,39 +636,72 @@ input[type=file]{padding:6px;font-size:12px}
   color:var(--doc-muted); margin-top:4px;
 }
 .doc-style-classic .doc-meta{ text-align:center; margin-top:6px; }
+/* Dates section: no dotted divider, just whitespace */
 .doc-style-classic .doc-dates{
   display:flex; justify-content:center; gap:32px; font-size:12px;
-  margin-top:14px; padding-top:12px; border-top:1px dotted var(--doc-line);
+  margin-top:18px;
 }
 .doc-style-classic .doc-dates dl{display:flex;flex-direction:column;align-items:center;gap:2px;margin:0}
 .doc-style-classic .doc-dates dt{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--doc-muted)}
 .doc-style-classic .doc-dates dd{margin:0;font-family:var(--font-mono);font-size:12px}
+/* Bill-to: no top/bottom borders, separated by whitespace */
 .doc-style-classic .doc-billto{
   display:grid; grid-template-columns:auto 1fr; gap:14px;
-  align-items:start; margin-bottom:26px; padding:14px 0;
-  border-top:1px solid var(--doc-line); border-bottom:1px solid var(--doc-line);
+  align-items:start; margin-bottom:28px; padding:0;
 }
 .doc-style-classic .doc-billto-label{
   font-size:11px; letter-spacing:.12em; text-transform:uppercase;
-  color:var(--doc-ink); font-weight:600;
+  color:var(--doc-muted); font-weight:600;
   font-family:var(--font-display); padding-top:2px;
 }
 .doc-style-classic .doc-billto-label::after{content:":"}
 .doc-style-classic .doc-billto-name{
   font-family:var(--font-display); font-size:17px; font-weight:500;
 }
-.doc-style-classic .doc-items{ border-collapse:collapse; }
+/* Items table: no borders anywhere. Column headers stand out via weight
+   and tracking. Rate / Amount columns get wider, fixed widths so currency
+   never wraps. */
+.doc-style-classic .doc-items{ border-collapse:collapse; table-layout:fixed; width:100%; }
 .doc-style-classic .doc-items th{
   text-align:left; font-size:11px; letter-spacing:.06em;
-  text-transform:uppercase; padding:10px 8px; font-weight:600;
-  border-top:1.5px solid var(--doc-ink); border-bottom:1.5px solid var(--doc-ink);
+  text-transform:uppercase; padding:14px 8px 12px; font-weight:700;
+  color:var(--doc-ink);
   background:transparent;
+  border:none;
+  white-space:nowrap;
 }
-.doc-style-classic .doc-items td{ padding:10px 8px; border-bottom:1px solid var(--doc-line-soft); }
+.doc-style-classic .doc-items th.num{ text-align:right; }
+.doc-style-classic .doc-items td{
+  padding:12px 8px; border:none; vertical-align:top;
+}
+.doc-style-classic .doc-items td.num{
+  white-space:nowrap;          /* currency figures stay on one line */
+  font-variant-numeric:tabular-nums;
+}
+/* Column widths: Description is flexible; the numeric columns are fixed
+   wide enough to fit "$ 999,999.99" without wrapping. */
+.doc-style-classic .doc-items thead th:nth-child(1){ width:auto; }      /* Description — flex */
+.doc-style-classic .doc-items thead th:nth-child(2){ width:9%;  }       /* Qty */
+.doc-style-classic .doc-items thead th:nth-child(3){ width:11%; }       /* Unit */
+.doc-style-classic .doc-items thead th:nth-child(4){ width:18%; }       /* Rate ($) */
+.doc-style-classic .doc-items thead th:nth-child(5){ width:20%; }       /* Amount ($) */
+/* Subtle row-banding via background tint (NOT a black border) for legibility */
+.doc-style-classic .doc-items tbody tr:nth-child(even) td{
+  background:rgba(0,0,0,0.025);
+}
+/* Grand total: weighted typography + extra spacing, no rules */
+.doc-style-classic .doc-totals{ margin-top:8px; }
+.doc-style-classic .doc-totals-row{
+  display:flex; justify-content:space-between; align-items:baseline;
+  gap:40px; padding:6px 0; min-width:46%;
+  white-space:nowrap;
+}
 .doc-style-classic .doc-totals-row.grand{
-  border-top:1.5px solid var(--doc-ink); border-bottom:3px double var(--doc-ink);
-  padding:8px 0; font-family:var(--font-display);
-  font-size:16px; font-weight:500;
+  border:none;
+  margin-top:10px; padding:14px 0 4px;
+  font-family:var(--font-display);
+  font-size:18px; font-weight:600;
+  letter-spacing:.02em;
 }
 
 /* ----- STYLE: STUDIO (colored header block, signature footer) -----
@@ -837,6 +897,19 @@ input[type=file]{padding:6px;font-size:12px}
   align-items:end;
   font-size:11.5px; line-height:1.55;
 }
+/* Classic strips ALL divider lines — including the one above the footer.
+   Whitespace alone separates the footer from the body. */
+.doc-style-classic .doc-sigblock{
+  border-top:none;
+  margin-top:40px;
+  padding-top:0;
+}
+/* Classic's notes/payment-terms block also drops any divider that may have
+   been carried over from base styles. */
+.doc-style-classic .doc-footer{
+  border-top:none;
+  padding-top:24px;
+}
 .doc-sigblock-sig img{
   max-width:180px; max-height:64px; object-fit:contain;
   display:block;
@@ -863,11 +936,15 @@ input[type=file]{padding:6px;font-size:12px}
 
 
 /* ----- shared doc bits ----- */
-.doc-items{ width:100%; border-collapse:collapse; margin-bottom:18px; font-size:12px; }
-.doc-items th.num{text-align:right}
+.doc-items{ width:100%; border-collapse:collapse; margin-bottom:18px; font-size:12px; table-layout:fixed; }
+.doc-items th.num{text-align:right; white-space:nowrap}
 .doc-items td{ padding:11px 6px 11px 0; vertical-align:top; }
-.doc-items td.num{ text-align:right; font-family:var(--font-mono); }
-.doc-items td.desc{padding-right:16px}
+.doc-items td.num{
+  text-align:right; font-family:var(--font-mono);
+  white-space:nowrap;                  /* currency figure never wraps to a second line */
+  font-variant-numeric:tabular-nums;   /* digit widths align across rows */
+}
+.doc-items td.desc{padding-right:16px; word-wrap:break-word; overflow-wrap:anywhere;}
 .item-desc-main{font-weight:500;color:var(--doc-ink)}
 .item-desc-sub{font-size:10.5px;color:var(--doc-muted);margin-top:2px;font-style:italic}
 .doc-totals{ margin-left:auto; width:300px; margin-top:10px; font-size:12px; }
@@ -2858,6 +2935,14 @@ function newDocument(type='invoice'){
 // FORMATTING / CALC
 // ============================================================
 const CURRENCY = { KES:'KSh', USD:'$', EUR:'€', GBP:'£' };
+// Plain number formatter — currency symbol lives in the column header, so
+// row cells render just the figure (e.g., "1,250.00", not "$ 1,250.00").
+// Keeps Rate and Amount columns narrow and prevents the currency symbol from
+// wrapping to a separate line when figures get long.
+const fmtNumber = (n) => {
+  if (isNaN(n)) n = 0;
+  return Number(n).toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 });
+};
 const fmtMoney = (n,c='KES')=>{
   if (isNaN(n)) n=0;
   return (CURRENCY[c]||c) + ' ' + Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -2962,8 +3047,8 @@ function renderDocument(doc){
       </td>
       <td class="num">${(Number(it.quantity)||0).toLocaleString()}</td>
       <td>${esc(it.unit||'')}</td>
-      <td class="num">${fmtMoney(Number(it.rate)||0, cur)}</td>
-      <td class="num">${fmtMoney(amt, cur)}</td>
+      <td class="num">${fmtNumber(Number(it.rate)||0)}</td>
+      <td class="num">${fmtNumber(amt)}</td>
     </tr>`;
   }).join('');
 
@@ -3162,17 +3247,20 @@ function renderDocument(doc){
   const stampText = fillTemplate(b.stampLine, { name:b.contact||'', business:b.name||'' });
   const stampHTML = stampText.trim() ? `<div class="doc-stamp">${esc(stampText)}</div>` : '';
 
-  return headerHTML + billtoHTML + buildItemsTable(itemsHtml) + totalsHTML + footerHTML + sigBlockHTML + stampHTML;
+  return headerHTML + billtoHTML + buildItemsTable(itemsHtml, cur) + totalsHTML + footerHTML + sigBlockHTML + stampHTML;
 }
 
-function buildItemsTable(rows){
+function buildItemsTable(rows, cur){
+  // Resolve currency symbol once and embed it in the column headers, so cells
+  // can stay narrow and never wrap "$\n1,250" onto two lines.
+  const sym = CURRENCY[cur] || cur || '';
   return `<table class="doc-items">
     <thead><tr>
       <th>Description</th>
       <th class="num">Qty</th>
       <th>Unit</th>
-      <th class="num">Rate</th>
-      <th class="num">Amount</th>
+      <th class="num">Rate (${esc(sym)})</th>
+      <th class="num">Amount (${esc(sym)})</th>
     </tr></thead>
     <tbody>
       ${rows || `<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--doc-muted);font-style:italic">No line items yet.</td></tr>`}
@@ -3542,7 +3630,11 @@ async function exportPDF({ silent = false } = {}){
       footerClone.style.marginTop = '0';
       footerClone.style.paddingTop = '12px';
       footerClone.style.paddingBottom = '0';
-      footerClone.style.borderTop = '1px solid var(--doc-line)';
+      // Classic strips all dividers — keep that promise in the PDF too.
+      // Other layouts benefit from a thin separator above the footer to
+      // separate signature/contact info from the body content above.
+      const isClassic = source.classList.contains('doc-style-classic');
+      footerClone.style.borderTop = isClassic ? 'none' : '1px solid var(--doc-line)';
       footerWrapper.appendChild(footerClone);
     }
     renderHost.appendChild(footerWrapper);
