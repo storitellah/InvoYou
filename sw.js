@@ -17,7 +17,7 @@
  * the old cache and forces a fresh fetch of the HTML.
  */
 
-const CACHE_VERSION = 'invoyou-v9';
+const CACHE_VERSION = 'invoyou-v10';
 const APP_SHELL = [
   '/',
   '/index.html',

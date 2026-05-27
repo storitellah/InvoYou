@@ -389,38 +389,40 @@ input[type=file]{padding:6px;font-size:12px}
 .preview-frame{
   background:var(--paper); border:1px solid var(--line);
   border-radius:8px; box-shadow:var(--shadow);
-  /* The preview reads as a sheet of paper. We use min-aspect-ratio so a
-     short single-page doc still looks like a Letter sheet (8.5:11), but
-     a multi-page doc can grow taller naturally without getting cropped. */
-  min-height: calc(100vw * 11 / 8.5 / 2);  /* fallback for older browsers */
+  /* Preview reads as a sheet of paper at the selected page size. The CSS
+     variables --page-aspect-w / --page-aspect-h are set by applyDesign()
+     based on settings.pageSize (defaults: Letter = 8.5/11). */
+  min-height: calc(100vw * var(--page-aspect-h, 11) / var(--page-aspect-w, 8.5) / 2);
   overflow:visible;
 }
-/* Modern browsers: use aspect-ratio with min-height so the frame can grow */
 @supports (aspect-ratio: 1){
   .preview-frame{
-    aspect-ratio: 8.5 / 11;
+    aspect-ratio: var(--page-aspect-w, 8.5) / var(--page-aspect-h, 11);
     height: auto;
-    /* aspect-ratio acts as a hint, but content can push the box taller */
   }
 }
 
 /* ============================================================
    DOCUMENT — base + 4 style variants
    Wrapper class `.doc-style-{name}` swaps the look.
-   Padding values here mirror the PDF generator's margins exactly
-   so preview and exported file are identical.
+
+   Margin policy (locked, all four sides):
+     • 1 inch (96px @ 96dpi) of pure white margin on top, bottom, left, right.
+     • No visual element — header band, table border, totals divider, footer —
+       may enter that margin.
+     • Body content lives in the printable region: page_width − 2in wide.
+
+   The PDF exporter uses the SAME values so what you see in the preview
+   pane is what lands in the file.
    ============================================================ */
 .document{
   background:var(--doc-bg);
   color:var(--doc-ink);
-  /* Letter margins: 56px top / 72px sides / 40px bottom. These are the
-     SAME values the PDF exporter uses (TOP_PAD_PX, SIDE_PAD_PX, etc.) so
-     preview matches output. Studio overrides this to 0 because its
-     yellow header bleeds to the edge. */
-  padding:56px 72px 40px;
+  /* Hard 1-inch padding on all sides. 96px @ 96dpi. Studio (which used
+     to bleed its yellow header) now respects this margin too. */
+  padding:96px;
   font-size:13px; line-height:1.55;
   font-feature-settings:"tnum";
-  /* Minimum letter-page proportions so empty docs still look like paper */
   min-height: 100%;
 }
 .doc-logo-img{
@@ -573,7 +575,7 @@ input[type=file]{padding:6px;font-size:12px}
 .doc-style-modern .doc-totals-row.grand .lbl{color:#fff}
 
 /* ----- STYLE: CLASSIC ----- */
-.doc-style-classic{ border:1px solid var(--doc-ink); padding:56px 72px 40px; }
+.doc-style-classic{ border:1px solid var(--doc-ink); /* inherits 96px padding from .document */ }
 .doc-style-classic .doc-head{ text-align:center; padding-bottom:24px; border-bottom:3px double var(--doc-ink); margin-bottom:28px; }
 .doc-style-classic .doc-brand{
   display:flex; justify-content:center; align-items:center;
@@ -642,17 +644,18 @@ input[type=file]{padding:6px;font-size:12px}
   font-size:16px; font-weight:500;
 }
 
-/* ----- STYLE: STUDIO (yellow-block header, signature footer) -----
-   This layout takes its cue from the freelance-photographer invoice style:
-   a solid colored header block bleeds to the page edges, with the
-   business name at large and the amount-due block on the right. The
-   document body lives in white below it. Bottom strip carries the
-   signature image (when provided), business address, and contact info.
+/* ----- STYLE: STUDIO (colored header block, signature footer) -----
+   Originally the yellow header bled to the page edges. With the new strict
+   1-inch margin policy, the header is now a CONTAINED colored block that
+   sits INSIDE the document's white margin. Business name + INVOICE label on
+   the left, Amount Due block on the right, all within the printable region.
+
+   We also drop the inner studio paddings (the previous 72px sides) because
+   the OUTER document padding (96px = 1in) now provides all margin. Each
+   section is flush to the left/right of the printable area.
 */
 .doc-style-studio{
-  /* The header bleeds full-bleed to the document edges, so we cancel the
-     standard side padding for it and re-apply via negative margins. */
-  padding-top:0; padding-left:0; padding-right:0;
+  /* Inherit the standard 96px (1in) padding on all sides — no bleed override. */
 }
 .doc-style-studio .doc-head{
   display:grid;
@@ -660,59 +663,60 @@ input[type=file]{padding:6px;font-size:12px}
   gap:0;
   background:var(--doc-accent);
   color:#0F0F0F;
-  padding:56px 72px;
-  margin:0 0 32px 0;
+  padding:36px 40px;
+  margin:0 0 28px 0;
   align-items:center;
+  border-radius:4px;
 }
-/* Right "amount due" pocket — slightly darker tone of the accent */
+/* Right "amount due" pocket — slightly darker tone of the accent.
+   It used to use negative margins to stretch into the bleed area; with
+   the contained block, it's just a column inside the grid. */
 .doc-style-studio .doc-head > .doc-meta{
-  background:rgba(0,0,0,0.18);
-  margin:-56px -72px -56px 0;
-  padding:56px 72px;
+  background:rgba(0,0,0,0.16);
+  margin:-36px -40px -36px 0;
+  padding:36px 40px;
   align-self:stretch;
   display:flex; flex-direction:column; justify-content:center;
   text-align:right;
+  border-radius:0 4px 4px 0;
 }
-.doc-style-studio .doc-brand-block{ display:none; }   /* monogram lives elsewhere in this layout */
+.doc-style-studio .doc-brand-block{ display:none; }
 .doc-style-studio .doc-business-name{
   font-family:var(--font-display);
-  font-size:calc(34px * var(--name-scale, 1));
+  font-size:calc(30px * var(--name-scale, 1));
   font-weight:700; letter-spacing:.02em;
   line-height:1.05; text-transform:uppercase;
   color:#0F0F0F;
   font-variation-settings:"SOFT" 40,"opsz" 144;
 }
-.doc-style-studio .doc-business-tag{
-  display:none;   /* the type ("INVOICE" / "QUOTATION") below replaces this */
-}
-.doc-style-studio .doc-business-detail{ display:none; }  /* address moves to footer */
+.doc-style-studio .doc-business-tag{ display:none; }
+.doc-style-studio .doc-business-detail{ display:none; }
 .doc-style-studio .doc-type{
-  font-family:var(--font-body); font-size:12px; font-weight:600;
-  letter-spacing:.28em; text-transform:uppercase;
-  color:#0F0F0F; margin-top:8px; opacity:.85;
+  font-family:var(--font-body); font-size:11.5px; font-weight:600;
+  letter-spacing:.26em; text-transform:uppercase;
+  color:#0F0F0F; margin-top:6px; opacity:.85;
 }
 .doc-style-studio .doc-type em{font-style:normal;color:inherit}
 .doc-style-studio .doc-head .doc-meta .doc-amount-label{
-  font-size:11px; font-weight:600; letter-spacing:.16em;
+  font-size:10.5px; font-weight:600; letter-spacing:.16em;
   text-transform:uppercase; color:#0F0F0F; opacity:.8;
   white-space:nowrap;
 }
 .doc-style-studio .doc-head .doc-meta .doc-amount-value{
-  font-family:var(--font-display); font-size:30px; font-weight:600;
-  letter-spacing:-.01em; color:#0F0F0F; margin-top:8px;
+  font-family:var(--font-display); font-size:26px; font-weight:600;
+  letter-spacing:-.01em; color:#0F0F0F; margin-top:6px;
   font-variation-settings:"SOFT" 40,"opsz" 100;
   white-space:nowrap;
 }
-/* Hide the standard "doc-number" + "doc-dates" inside the header — they
-   get rendered separately under the BILL TO block in this layout */
 .doc-style-studio .doc-head .doc-number,
 .doc-style-studio .doc-head .doc-dates{ display:none; }
 
-/* BILL TO + meta sit side by side just under the header */
+/* BILL TO + meta sit side by side just under the header. No extra side
+   padding — the document already has 1in around everything. */
 .doc-style-studio .doc-billto{
   display:grid; grid-template-columns:1fr auto; align-items:start;
-  gap:40px; padding:0 72px;
-  margin-bottom:28px;
+  gap:40px; padding:0;
+  margin-bottom:24px;
 }
 .doc-style-studio .doc-billto-label{
   font-size:11px; letter-spacing:.18em; text-transform:uppercase;
@@ -750,8 +754,8 @@ input[type=file]{padding:6px;font-size:12px}
 
 /* Items table — clean, no fills, divider above and below header row */
 .doc-style-studio .doc-items{
-  margin:0 72px 20px;
-  width:calc(100% - 144px);
+  margin:0 0 20px;
+  width:100%;
 }
 .doc-style-studio .doc-items th{
   text-align:left; font-size:13px; font-weight:700;
@@ -786,7 +790,7 @@ input[type=file]{padding:6px;font-size:12px}
 
 /* Totals area — minimal, right-aligned */
 .doc-style-studio .doc-totals{
-  margin:0 72px 28px; padding:0;
+  margin:0 0 24px; padding:0;
   background:transparent; border:none;
   display:flex; flex-direction:column; align-items:flex-end;
 }
@@ -812,7 +816,7 @@ input[type=file]{padding:6px;font-size:12px}
 
 /* Notes/terms — full width, beneath totals */
 .doc-style-studio .doc-footer{
-  padding:0 72px 24px;
+  padding:0 0 18px;
   display:grid; grid-template-columns:1fr 1fr; gap:32px;
 }
 .doc-style-studio .doc-footer-label{
@@ -848,10 +852,10 @@ input[type=file]{padding:6px;font-size:12px}
   font-size:11.5px; color:var(--doc-ink); margin-bottom:4px;
 }
 
-/* Studio uses different horizontal padding because its body is edge-flush */
+/* Studio sigblock — flush to body padding (no extra side gutter needed) */
 .doc-style-studio .doc-sigblock{
   margin-top:0;
-  padding:24px 72px 0;
+  padding:18px 0 0;
 }
 
 /* Hide the old text stamp on Studio — signature image takes its place */
@@ -2038,6 +2042,17 @@ input[type=file]{padding:6px;font-size:12px}
           </div>
           <div class="form-grid" style="margin-top:11px">
             <div>
+              <label>Page size
+                <span style="font-weight:400;color:var(--muted);font-size:11px">(controls PDF export + Print)</span>
+              </label>
+              <select id="s-page-size">
+                <option value="letter">US Letter (8.5 × 11 in)</option>
+                <option value="a4">A4 (210 × 297 mm)</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-grid" style="margin-top:11px">
+            <div>
               <label>Invoice prefix</label>
               <input id="s-prefix-inv" type="text" />
             </div>
@@ -2561,6 +2576,7 @@ const DEFAULTS = {
     defCurrency: "KES",
     defVat: 16,
     defVatOn: true,
+    pageSize: "letter",   // "letter" or "a4" — controls PDF + print output
     prefixInv: "INV",
     prefixQuo: "QUO",
     prefixPro: "PFI",
@@ -2893,6 +2909,11 @@ function applyDesign(){
 
   // business-name scale (controls .doc-business-name font-size on the rendered doc)
   r.setProperty('--name-scale', (state.business.nameScale || 100)/100);
+
+  // Page-size aspect ratio for the preview frame. Letter is 8.5:11, A4 is 210:297.
+  const ps = state.settings && state.settings.pageSize === 'a4' ? 'a4' : 'letter';
+  r.setProperty('--page-aspect-w', ps === 'a4' ? '210' : '8.5');
+  r.setProperty('--page-aspect-h', ps === 'a4' ? '297' : '11');
 
   // apply layout class to .document
   const docEl = document.getElementById('document');
@@ -3329,22 +3350,99 @@ function createRenderHost(sourceEl, width){
   return { host, clone, isStudio };
 }
 
-// Export the current document as a multi-page PDF with header on EVERY page
-// and footer on the LAST page only.
+// ============================================================
+// PDF EXPORT — strict 1-inch margins, A4 or Letter, multi-page
+// ============================================================
+// Page-size catalog. Each entry holds:
+//   • widthMm / heightMm  — for jsPDF (mm)
+//   • widthPx / heightPx  — for html2canvas (CSS pixels @ 96dpi)
+//   • A 1-inch margin = 25.4 mm = 96 px (at 96dpi).
+// Adding a new size is just a new entry here; the rest of the function
+// computes everything from these numbers.
+const PAGE_SIZES = {
+  letter: {
+    label:    'US Letter',
+    widthMm:  215.9, heightMm: 279.4,
+    widthPx:  816,   heightPx: 1056,
+    jsPdfFormat: 'letter'
+  },
+  a4: {
+    label:    'A4',
+    widthMm:  210, heightMm: 297,
+    widthPx:  794, heightPx: 1123,
+    jsPdfFormat: 'a4'
+  }
+};
+
+// 1 inch in pixels (at 96dpi) and in millimeters.
+const MARGIN_IN_PX = 96;
+const MARGIN_IN_MM = 25.4;
+
+// Page-number reserve (within the bottom margin) — we draw "Page X of Y"
+// inside the margin band, NOT in the content area, so this doesn't eat into
+// the printable region. 12px below the content edge, leaves ~12px above page edge.
+const PAGE_NUMBER_OFFSET_PX = 36;       // distance from content bottom to page-num text
+const PAGE_NUMBER_FONT_SIZE = 9;
+
+// Wait until html2canvas + jspdf are loaded and callable.
+async function ensureLibsReady(){
+  for (let i = 0; i < 50; i++){
+    if (typeof window.html2canvas === 'function' &&
+        window.jspdf && typeof window.jspdf.jsPDF === 'function'){
+      return true;
+    }
+    await new Promise(r => setTimeout(r, 100));
+  }
+  return false;
+}
+
+// Wait for fonts so the capture uses the right typefaces (not system fallbacks).
+async function ensureFontsLoaded(){
+  if (document.fonts && document.fonts.ready){
+    try { await document.fonts.ready; } catch (e){ /* best effort */ }
+  }
+  await new Promise(r => setTimeout(r, 80));
+}
+
+// Render an element to a canvas at the given CSS width. Returns a Canvas.
+async function renderToCanvas(el, widthPx){
+  return await window.html2canvas(el, {
+    scale: 2,                    // 2x for crisp text at print scale
+    useCORS: true,
+    letterRendering: true,
+    backgroundColor: '#ffffff',
+    width: widthPx,
+    windowWidth: widthPx,
+    logging: false
+  });
+}
+
+// Build a fresh off-canvas render host (positioned at viewport origin with
+// z-index:-1 so html2canvas can read valid coordinates but the user can't
+// see it). Returns the host element — caller is responsible for removing it.
+function buildRenderHost(widthPx){
+  const host = document.createElement('div');
+  host.className = 'pdfRenderHost';
+  host.style.cssText = [
+    'position:fixed','top:0','left:0','z-index:-1',
+    'width:' + widthPx + 'px',
+    'background:#ffffff','pointer-events:none','opacity:1','overflow:visible'
+  ].join(';');
+  document.body.appendChild(host);
+  return host;
+}
+
+// Export the current document as a multi-page PDF.
 //
-// Strategy:
-//   1. Clone the on-screen document into an off-canvas A4-width host.
-//   2. Separate the document into THREE rendered regions:
-//        - HEADER:  yellow band (.doc-head) — captured once, repeated on every page
-//        - BODY:    everything between header and footer (bill-to, items table,
-//                   totals, notes/footer block)
-//        - FOOTER:  signature/contact block (.doc-sigblock) — captured once,
-//                   appears at the bottom of the LAST page only
-//   3. Slice the BODY canvas into page-sized chunks, choosing slice points
-//      that fall on safe boundaries (between table rows, around the totals
-//      box, etc.) so we never split content mid-row.
-//   4. Assemble pages in jsPDF: header → body slice → (footer if last page)
-//      → page number ("Page X of Y").
+// Layout rules (locked):
+//   • 1-inch (25.4mm / 96px) margin on top, bottom, left, right of EVERY page.
+//   • Header at top of every page (inside the margin).
+//   • Footer at bottom of every page (inside the margin).
+//   • Body content flows between header and footer.
+//   • "Page X of Y" centered at the bottom margin band.
+//   • Page breaks fall on safe boundaries: between rows (never mid-row),
+//     around totals (which stay together), and so notes/payment-terms don't
+//     get orphaned.
 async function exportPDF({ silent = false } = {}){
   if (!current){
     if (!silent) toast('Open a document first');
@@ -3356,7 +3454,7 @@ async function exportPDF({ silent = false } = {}){
     return null;
   }
 
-  // Lock buttons during render
+  // Lock buttons during render so the user can't fire two captures in parallel.
   const exportBtnEl = document.getElementById('exportPdfBtn');
   const printBtnEl  = document.getElementById('printBtn');
   const origExportText = exportBtnEl ? exportBtnEl.textContent.trim() : '';
@@ -3366,215 +3464,305 @@ async function exportPDF({ silent = false } = {}){
   }
   if (printBtnEl && !silent) printBtnEl.disabled = true;
 
-  const ready = await ensureHtml2PdfReady();
-  if (!ready){
+  // 1) Libraries + fonts ready
+  if (!await ensureLibsReady()){
     if (!silent) toast('PDF library failed to load — check your connection');
     if (exportBtnEl && !silent){ exportBtnEl.disabled = false; exportBtnEl.textContent = origExportText; }
     if (printBtnEl && !silent) printBtnEl.disabled = false;
     return null;
   }
+  await ensureFontsLoaded();
 
-  await ensureFontsReady();
+  // 2) Resolve page size from settings (default: letter)
+  const sizeKey = (state.settings && state.settings.pageSize) === 'a4' ? 'a4' : 'letter';
+  const PAGE = PAGE_SIZES[sizeKey];
 
-  // US Letter dimensions. Letter is 8.5"×11" which at 96dpi is 816×1056 px,
-  // and in mm is 215.9×279.4. We renamed from A4_* to PAGE_* so the rest of
-  // the function reads cleanly.
-  const PAGE_WIDTH_PX  = 816;        // 8.5 in @ 96dpi
-  const PAGE_HEIGHT_PX = 1056;       // 11  in @ 96dpi
-  const PAGE_WIDTH_MM  = 215.9;
-  const PAGE_HEIGHT_MM = 279.4;
+  // Printable region (page minus 1-inch margins on each side)
+  const PRINT_WIDTH_PX  = PAGE.widthPx  - 2 * MARGIN_IN_PX;
+  const PRINT_HEIGHT_PX = PAGE.heightPx - 2 * MARGIN_IN_PX;
 
-  // Margin inside the document. Studio uses 0 outer padding (yellow header
-  // bleeds to the edge), but its INNER body content still needs generous
-  // breathing room. Non-studio layouts use the same generous margin from
-  // their outer edge.
-  const SIDE_PAD_PX = 72;            // 0.75" — generous, classic letterhead feel
-  const TOP_PAD_PX  = 56;
-  const BOTTOM_PAD_PX = 40;
+  // 3) Build a clone of the document at PRINT WIDTH (NOT page width — the
+  //    document itself already has 96px padding internally, so by capturing
+  //    the document at print width we capture the full page-equivalent area.
+  //    Wait — the document's own internal padding is 96px (1in), and the
+  //    body content lives inside that. We want to render JUST the body's
+  //    contents (without the document's white margin), then position the
+  //    captured image at the 1in offset on the PDF page.)
+  //
+  // Strategy: render the document at PAGE WIDTH (so its built-in 96px
+  // padding fills the margin areas), and the inner content fills the
+  // printable region. Then when we place slices on the PDF page, we
+  // position them at (0, 0) since the cloned document already includes
+  // the white margins.
+  //
+  // No — that doesn't work because we ALSO want to repeat the header
+  // on every page (at the TOP margin band, not floating below it).
+  //
+  // Cleaner approach:
+  //   • Render header AT PRINT WIDTH (no document padding around it)
+  //   • Render footer AT PRINT WIDTH
+  //   • Render the body's "middle section" AT PRINT WIDTH (also no padding)
+  //   • Position each on the PDF at (MARGIN, computed-y) so margins are
+  //     enforced uniformly.
+  //
+  // To render only the content (not the document's outer 1in padding) we
+  // clone the document and FORCE its padding to 0, then render. The
+  // document's inner sections retain their own internal spacing.
 
-  const { host, clone, isStudio } = createRenderHost(source, PAGE_WIDTH_PX);
+  const headerEl = source.querySelector('.doc-head');
+  const sigBlockEl = source.querySelector('.doc-sigblock');
+  if (!headerEl){
+    if (!silent) toast('Document is missing a header — cannot export');
+    if (exportBtnEl && !silent){ exportBtnEl.disabled = false; exportBtnEl.textContent = origExportText; }
+    if (printBtnEl && !silent) printBtnEl.disabled = false;
+    return null;
+  }
 
-  // Wait two frames so layout is computed
-  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-
-  // Find header & footer elements in the clone
-  const headerEl = clone.querySelector('.doc-head');
-  const footerEl = clone.querySelector('.doc-sigblock');
-
-  // Build the BODY element by cloning the document and removing header+footer.
-  // We keep this as a separate cloned node so we can capture it cleanly.
-  // For non-studio layouts we keep the document padding around the body.
-  const bodyHost = document.createElement('div');
-  bodyHost.style.cssText = [
-    'position:fixed','top:0','left:0','z-index:-1',
-    'width:' + PAGE_WIDTH_PX + 'px',
-    'background:#ffffff','pointer-events:none','opacity:1','overflow:visible'
-  ].join(';');
-  const bodyClone = source.cloneNode(true);
-  bodyClone.style.cssText = [
-    'width:' + PAGE_WIDTH_PX + 'px',
-    'box-sizing:border-box',
-    'background:#ffffff',
-    'box-shadow:none','border:none','border-radius:0','margin:0',
-    isStudio
-      ? `padding:${TOP_PAD_PX}px ${SIDE_PAD_PX}px 0`         // studio: header is separate, this is body padding
-      : `padding:${TOP_PAD_PX}px ${SIDE_PAD_PX}px`           // others: same generous padding
-  ].join(';');
-  // strip header & footer from the body clone so we render JUST the middle
-  const bcHead = bodyClone.querySelector('.doc-head');
-  if (bcHead) bcHead.remove();
-  const bcFoot = bodyClone.querySelector('.doc-sigblock');
-  if (bcFoot) bcFoot.remove();
-  // Add some top padding inside the body clone for studio (so body content
-  // Body padding is now set above with the rest of the layout-specific styles.
-  bodyHost.appendChild(bodyClone);
-  document.body.appendChild(bodyHost);
-
-  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-
-  // Compute safe page-break Y positions from the rendered body. These are
-  // pixel offsets from the top of bodyClone where it's safe to cut a page:
-  //   - the END of each <tr> (so we slice between rows, never through one)
-  //   - the END of .doc-totals (so totals stay together)
-  //   - the END of .doc-footer (so notes/terms stay whole)
-  // We capture the bodyClone's own getBoundingClientRect as our origin,
-  // then for each safe element compute (its bottom) - (bodyClone top).
-  const bodyRect = bodyClone.getBoundingClientRect();
-  const safeYs = [];
-  bodyClone.querySelectorAll('.doc-items tbody tr, .doc-totals, .doc-footer > *').forEach(el => {
-    const r = el.getBoundingClientRect();
-    const yBottom = r.bottom - bodyRect.top;
-    if (yBottom > 0) safeYs.push(yBottom);
-  });
-  safeYs.push(bodyRect.height);
-  safeYs.sort((a, b) => a - b);
+  const renderHost = buildRenderHost(PRINT_WIDTH_PX);
 
   try {
-    // ---- 1) Capture header (once, reused on every page) ----
-    let headerCanvas = null;
-    let headerHeightPx = 0;
-    if (headerEl){
-      headerCanvas = await renderElementToCanvas(headerEl, PAGE_WIDTH_PX);
-      headerHeightPx = headerCanvas.height / 2;
+    // ---- HEADER clone (just .doc-head, rendered at print width) ----
+    // We clone it inside a wrapper that mimics the document's class so
+    // CSS scoped to ".doc-style-X" still applies. The wrapper has no padding.
+    const headerWrapper = document.createElement('div');
+    headerWrapper.className = source.className;   // copies "document doc-style-studio" etc.
+    headerWrapper.style.cssText = 'padding:0;background:#fff;width:' + PRINT_WIDTH_PX + 'px;box-sizing:border-box;';
+    const headerClone = headerEl.cloneNode(true);
+    headerClone.style.margin = '0';
+    headerWrapper.appendChild(headerClone);
+    renderHost.appendChild(headerWrapper);
+
+    // ---- FOOTER clone (signature/contact block) ----
+    const footerWrapper = document.createElement('div');
+    footerWrapper.className = source.className;
+    footerWrapper.style.cssText = 'padding:0;background:#fff;width:' + PRINT_WIDTH_PX + 'px;box-sizing:border-box;margin-top:40px;';
+    let footerClone = null;
+    if (sigBlockEl){
+      footerClone = sigBlockEl.cloneNode(true);
+      footerClone.style.marginTop = '0';
+      footerClone.style.paddingTop = '12px';
+      footerClone.style.paddingBottom = '0';
+      footerClone.style.borderTop = '1px solid var(--doc-line)';
+      footerWrapper.appendChild(footerClone);
     }
+    renderHost.appendChild(footerWrapper);
 
-    // ---- 2) Capture body (one tall canvas) ----
-    const bodyCanvas = await renderElementToCanvas(bodyClone, PAGE_WIDTH_PX);
-    const bodyHeightPx = bodyCanvas.height / 2;
+    // ---- BODY clone — document with header AND sigblock removed ----
+    // What's left: BILL TO + meta + items table + totals + notes/payment-terms.
+    const bodyWrapper = document.createElement('div');
+    bodyWrapper.className = source.className;
+    bodyWrapper.style.cssText = 'padding:0;background:#fff;width:' + PRINT_WIDTH_PX + 'px;box-sizing:border-box;margin-top:40px;';
+    const bodyContentClone = source.cloneNode(true);
+    bodyContentClone.style.padding = '0';
+    bodyContentClone.style.width = PRINT_WIDTH_PX + 'px';
+    const bcHead = bodyContentClone.querySelector('.doc-head');
+    if (bcHead) bcHead.remove();
+    const bcSig = bodyContentClone.querySelector('.doc-sigblock');
+    if (bcSig) bcSig.remove();
+    // Move the bodyContentClone's contents directly into bodyWrapper so we
+    // don't have a nested .document with double styles.
+    while (bodyContentClone.firstChild){
+      bodyWrapper.appendChild(bodyContentClone.firstChild);
+    }
+    renderHost.appendChild(bodyWrapper);
 
-    // ---- 3) Capture footer (once, used on last page only) ----
+    // Wait two RAFs so the browser computes layout on all three clones.
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+    // ---- Capture all three to canvases ----
+    const headerCanvas = await renderToCanvas(headerWrapper, PRINT_WIDTH_PX);
+    const headerHpx    = headerCanvas.height / 2;   // 2x scale → divide
+
+    const bodyCanvas = await renderToCanvas(bodyWrapper, PRINT_WIDTH_PX);
+    const bodyHpx    = bodyCanvas.height / 2;
+
     let footerCanvas = null;
-    let footerHeightPx = 0;
-    if (footerEl){
-      footerCanvas = await renderElementToCanvas(footerEl, PAGE_WIDTH_PX);
-      footerHeightPx = footerCanvas.height / 2;
+    let footerHpx    = 0;
+    if (footerClone){
+      footerCanvas = await renderToCanvas(footerWrapper, PRINT_WIDTH_PX);
+      footerHpx    = footerCanvas.height / 2;
     }
 
-    // ---- 4) Plan pages ----
-    const BODY_AVAIL_NON_LAST = PAGE_HEIGHT_PX - headerHeightPx;
-    const FOOTER_GAP = 24;
-    const BODY_AVAIL_LAST     = PAGE_HEIGHT_PX - headerHeightPx - footerHeightPx - FOOTER_GAP;
-    const PAGE_NUMBER_RESERVE = 28;
+    // ---- Compute safe page-break Y positions in body coordinates ----
+    // The body wrapper hosts the actual elements, so we can walk it for breakpoints.
+    const bodyRect = bodyWrapper.getBoundingClientRect();
+    const safeYs = [];
+    // Safe boundary = BOTTOM of these elements (i.e., we can break AFTER them)
+    bodyWrapper.querySelectorAll('.doc-items tbody tr, .doc-totals-row, .doc-footer > *, .doc-billto').forEach(el => {
+      const r = el.getBoundingClientRect();
+      const yBottom = r.bottom - bodyRect.top;
+      if (yBottom > 0 && yBottom <= bodyHpx) safeYs.push(yBottom);
+    });
+    safeYs.push(bodyHpx);
+    safeYs.sort((a,b) => a-b);
+    // De-dupe near-equal Ys (within 2px)
+    const dedupedSafeYs = safeYs.filter((y, i) => i === 0 || y - safeYs[i-1] > 2);
 
-    const pageRanges = [];
-    let cursor = 0;
-    const totalBodyHeight = bodyHeightPx;
+    // Also find the table header's BOTTOM position — we use this to ensure
+    // the header is never orphaned (visible without any body rows below it).
+    let tableHeaderBottomY = -1;
+    const theadEl = bodyWrapper.querySelector('.doc-items thead');
+    if (theadEl){
+      const r = theadEl.getBoundingClientRect();
+      tableHeaderBottomY = r.bottom - bodyRect.top;
+    }
+    // And the FIRST table row's bottom — if the page break falls between
+    // the header and the first row, we'd orphan the header. Push the break
+    // to BEFORE the table header instead.
+    let firstRowBottomY = -1;
+    const firstRow = bodyWrapper.querySelector('.doc-items tbody tr');
+    if (firstRow){
+      const r = firstRow.getBoundingClientRect();
+      firstRowBottomY = r.bottom - bodyRect.top;
+    }
+    // The "table-start" Y is the TOP of the items table (where the thead begins).
+    let tableTopY = -1;
+    const itemsTable = bodyWrapper.querySelector('.doc-items');
+    if (itemsTable){
+      const r = itemsTable.getBoundingClientRect();
+      tableTopY = r.top - bodyRect.top;
+    }
+
+    // ---- Plan pages ----
+    // Per-page body height = print height - header height - footer height - footer gap - page-num reserve
+    const HEADER_TO_BODY_GAP = 14;    // px between header and body content on each page
+    const BODY_TO_FOOTER_GAP = 18;
+    const PER_PAGE_BODY_AVAIL = PRINT_HEIGHT_PX
+      - headerHpx - HEADER_TO_BODY_GAP
+      - (footerCanvas ? (footerHpx + BODY_TO_FOOTER_GAP) : 0);
 
     const HARD_LIMIT = 50;
-    while (cursor < totalBodyHeight && pageRanges.length < HARD_LIMIT){
-      const limitNonLast = cursor + (BODY_AVAIL_NON_LAST - PAGE_NUMBER_RESERVE);
-      const remaining = totalBodyHeight - cursor;
-      const isLast = (remaining <= (BODY_AVAIL_LAST - PAGE_NUMBER_RESERVE));
-      const limit = isLast
-        ? cursor + remaining
-        : limitNonLast;
+    const pageRanges = [];
+    let cursor = 0;
 
-      let chosenY = limit;
-      if (!isLast){
-        let best = -1;
-        for (const y of safeYs){
-          if (y > cursor && y <= limit) best = y;
-          if (y > limit) break;
-        }
-        chosenY = best > cursor ? best : limit;
+    while (cursor < bodyHpx && pageRanges.length < HARD_LIMIT){
+      const limit = Math.min(cursor + PER_PAGE_BODY_AVAIL, bodyHpx);
+
+      // If everything remaining fits on this page, take it all.
+      if (limit >= bodyHpx){
+        pageRanges.push({ from: cursor, to: bodyHpx });
+        cursor = bodyHpx;
+        break;
       }
 
-      if (chosenY - cursor < 100) chosenY = Math.min(cursor + Math.max(100, limit - cursor), totalBodyHeight);
+      // Find the largest safe Y in (cursor, limit].
+      let best = -1;
+      for (const y of dedupedSafeYs){
+        if (y > cursor && y <= limit) best = y;
+        if (y > limit) break;
+      }
 
-      pageRanges.push({ from: cursor, to: chosenY, isLast });
-      cursor = chosenY;
+      // If best is between tableHeaderBottom and firstRowBottom we'd orphan
+      // the table header. Pull break back to BEFORE the table top instead.
+      if (best > tableHeaderBottomY && best <= firstRowBottomY &&
+          tableTopY > cursor){
+        // Find the largest safe Y at or below tableTopY
+        let alt = -1;
+        for (const y of dedupedSafeYs){
+          if (y > cursor && y <= tableTopY) alt = y;
+          if (y > tableTopY) break;
+        }
+        if (alt > cursor) best = alt;
+        else best = tableTopY;   // hard-break right before the table
+      }
+
+      // Failsafe: if we found no break point, hard-cut at limit.
+      // Also ensure we advance by at least 100px per loop iteration.
+      if (best <= cursor + 50) best = limit;
+
+      pageRanges.push({ from: cursor, to: best });
+      cursor = best;
     }
 
-    // If the loop ended without flagging a page as last, mark the final one.
-    if (pageRanges.length && !pageRanges[pageRanges.length - 1].isLast){
-      pageRanges[pageRanges.length - 1].isLast = true;
-    }
-
-    // ---- 5) Assemble jsPDF document (Letter format) ----
+    // ---- Assemble jsPDF document ----
     const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF({ unit:'mm', format:'letter', orientation:'portrait', compress:true });
-    const PX_PER_MM = PAGE_WIDTH_PX / PAGE_WIDTH_MM;   // 816/215.9 ≈ 3.78
+    const pdf = new jsPDF({
+      unit: 'mm',
+      format: PAGE.jsPdfFormat,
+      orientation: 'portrait',
+      compress: true
+    });
 
-    const pxToMm = (px) => px / PX_PER_MM;
+    const pxToMm = (px) => px * (PAGE.widthMm / PAGE.widthPx);
+
+    // Header position: at top margin (MARGIN_IN_MM from top edge)
+    // Body position:   header bottom + HEADER_TO_BODY_GAP
+    // Footer position: bottom margin (MARGIN_IN_MM from bottom edge)
+
+    const headerImg = headerCanvas.toDataURL('image/jpeg', 0.95);
+    const headerHmm = pxToMm(headerHpx);
+
+    let footerImg = null;
+    let footerHmm = 0;
+    if (footerCanvas){
+      footerImg = footerCanvas.toDataURL('image/jpeg', 0.95);
+      footerHmm = pxToMm(footerHpx);
+    }
 
     for (let i = 0; i < pageRanges.length; i++){
+      if (i > 0) pdf.addPage();
+      const { from, to } = pageRanges[i];
       const pageNum = i + 1;
       const totalPages = pageRanges.length;
-      const { from, to, isLast } = pageRanges[i];
-      if (i > 0) pdf.addPage();
 
-      // Draw header at top, full bleed
-      let yOffsetMm = 0;
-      if (headerCanvas){
-        const headerImg = headerCanvas.toDataURL('image/jpeg', 0.95);
-        const headerHmm = pxToMm(headerHeightPx);
-        pdf.addImage(headerImg, 'JPEG', 0, 0, PAGE_WIDTH_MM, headerHmm);
-        yOffsetMm = headerHmm;
-      }
+      // Draw header at top margin (NOT bleed; inside the 1in margin band)
+      pdf.addImage(
+        headerImg, 'JPEG',
+        MARGIN_IN_MM, MARGIN_IN_MM,
+        PAGE.widthMm - 2 * MARGIN_IN_MM, headerHmm
+      );
 
-      // Slice the body canvas vertically into the page's range and draw it.
-      // bodyCanvas is at 2x scale, so we operate on doubled coordinates internally
-      // but output in CSS px (then convert to mm).
-      const sliceFromPx = from;
-      const sliceToPx   = to;
-      const sliceHeightPx = sliceToPx - sliceFromPx;
-      if (sliceHeightPx > 0){
+      // Draw body slice
+      const bodySliceHpx = to - from;
+      if (bodySliceHpx > 0){
+        // Cut a slice of the body canvas
         const tmp = document.createElement('canvas');
         tmp.width  = bodyCanvas.width;
-        tmp.height = Math.ceil(sliceHeightPx * 2);
+        tmp.height = Math.ceil(bodySliceHpx * 2);
         const ctx = tmp.getContext('2d');
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, tmp.width, tmp.height);
         ctx.drawImage(
           bodyCanvas,
-          0, sliceFromPx * 2,
-          bodyCanvas.width, sliceHeightPx * 2,
+          0, from * 2,
+          bodyCanvas.width, bodySliceHpx * 2,
           0, 0,
           tmp.width, tmp.height
         );
         const sliceImg = tmp.toDataURL('image/jpeg', 0.95);
-        const sliceHmm = pxToMm(sliceHeightPx);
-        pdf.addImage(sliceImg, 'JPEG', 0, yOffsetMm, PAGE_WIDTH_MM, sliceHmm);
+        pdf.addImage(
+          sliceImg, 'JPEG',
+          MARGIN_IN_MM,
+          MARGIN_IN_MM + headerHmm + pxToMm(HEADER_TO_BODY_GAP),
+          PAGE.widthMm - 2 * MARGIN_IN_MM,
+          pxToMm(bodySliceHpx)
+        );
       }
 
-      // Footer on the LAST page only, pinned to the bottom
-      if (isLast && footerCanvas){
-        const footerHmm = pxToMm(footerHeightPx);
-        const footerYmm = PAGE_HEIGHT_MM - footerHmm - pxToMm(PAGE_NUMBER_RESERVE);
-        const footerImg = footerCanvas.toDataURL('image/jpeg', 0.95);
-        pdf.addImage(footerImg, 'JPEG', 0, footerYmm, PAGE_WIDTH_MM, footerHmm);
+      // Draw footer at bottom margin (every page)
+      if (footerImg){
+        const footerYmm = PAGE.heightMm - MARGIN_IN_MM - footerHmm;
+        pdf.addImage(
+          footerImg, 'JPEG',
+          MARGIN_IN_MM, footerYmm,
+          PAGE.widthMm - 2 * MARGIN_IN_MM, footerHmm
+        );
       }
 
-      // Page number centered at the bottom
+      // Page number — centered in the bottom MARGIN band, NOT in the printable area.
+      // Position 8mm from the bottom edge so it's clearly outside the content.
       pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(9);
-      pdf.setTextColor(107, 107, 112);
-      const pageLabel = 'Page ' + pageNum + ' of ' + totalPages;
-      pdf.text(pageLabel, PAGE_WIDTH_MM / 2, PAGE_HEIGHT_MM - 8, { align:'center' });
+      pdf.setFontSize(PAGE_NUMBER_FONT_SIZE);
+      pdf.setTextColor(120, 120, 128);
+      pdf.text(
+        'Page ' + pageNum + ' of ' + totalPages,
+        PAGE.widthMm / 2,
+        PAGE.heightMm - 10,
+        { align: 'center' }
+      );
     }
 
     const filename = (current.number || 'document') + '.pdf';
-
     let result = null;
     if (silent){
       result = pdf.output('blob');
@@ -3589,8 +3777,7 @@ async function exportPDF({ silent = false } = {}){
     if (!silent) toast('PDF export failed: ' + (e.message || e));
     return null;
   } finally {
-    if (host.parentNode) document.body.removeChild(host);
-    if (bodyHost.parentNode) document.body.removeChild(bodyHost);
+    if (renderHost.parentNode) document.body.removeChild(renderHost);
     if (exportBtnEl && !silent){
       exportBtnEl.disabled = false;
       exportBtnEl.textContent = origExportText;
@@ -3598,6 +3785,7 @@ async function exportPDF({ silent = false } = {}){
     if (printBtnEl && !silent) printBtnEl.disabled = false;
   }
 }
+
 
 function fillForm(){
   document.querySelectorAll('#typeSwitch button').forEach(b=>{
@@ -4586,6 +4774,7 @@ function fillSettingsForm(){
   g('s-def-currency').value = s.defCurrency;
   g('s-def-vat').value = s.defVat;
   g('s-def-vat-on').value = String(s.defVatOn);
+  g('s-page-size').value = s.pageSize || 'letter';
   g('s-prefix-inv').value = s.prefixInv;
   g('s-prefix-pro').value = s.prefixPro || 'PFI';
   g('s-prefix-quo').value = s.prefixQuo;
@@ -4870,6 +5059,7 @@ document.getElementById('saveSettingsBtn').onclick = () => {
     defCurrency: g('s-def-currency').value,
     defVat: Number(g('s-def-vat').value)||0,
     defVatOn: g('s-def-vat-on').value === 'true',
+    pageSize: g('s-page-size').value === 'a4' ? 'a4' : 'letter',
     prefixInv: g('s-prefix-inv').value,
     prefixPro: g('s-prefix-pro').value || 'PFI',
     prefixQuo: g('s-prefix-quo').value,
