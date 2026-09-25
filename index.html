@@ -20,13 +20,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300..800&family=Inter:wght@300..700&family=Fraunces:opsz,wght,SOFT@9..144,300..700,0..100&family=Playfair+Display:ital,wght@0,400..800;1,400..800&family=Cormorant+Garamond:ital,wght@0,400..700;1,400..700&family=Work+Sans:wght@300..700&family=EB+Garamond:ital,wght@0,400..700;1,400..700&family=Lato:wght@300..700&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Source+Sans+3:wght@300..700&family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300..700&family=Spectral:ital,wght@0,300..700;1,300..700&family=IBM+Plex+Sans:wght@300..600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<!-- PDF generation libraries: html2canvas for DOM→Canvas, jsPDF for Canvas→PDF.
-     We bypass html2pdf.js because our paged exporter needs direct control over
-     both libraries to assemble per-page headers/footers — html2pdf bundles
-     them but doesn't expose them as globals.
-     Versions are pinned to known-good releases. -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <style>
 :root{
   /* InvoYou brand palette — Trust-led indigo with freelancer warmth */
@@ -1632,6 +1625,61 @@ input[type=file]{padding:6px;font-size:12px}
   }
 }
 ::selection{background:var(--accent);color:#fff}
+
+
+/* Three document types → equal-width segmented control on one line */
+.doc-type-switch{ display:grid !important; grid-template-columns:repeat(3,1fr) !important; gap:2px; }
+.doc-type-switch button{ min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+/* ============================================================
+   PAGED DOCUMENT PREVIEW — pages are drawn by the document engine
+   (same page list the PDF exporter writes), shown as paper cards.
+   ============================================================ */
+.preview-wrap{ max-height:calc(100vh - 48px); overflow:auto; padding-bottom:8px; scrollbar-gutter:stable; }
+.preview-frame{
+  background:transparent !important; border:none !important; box-shadow:none !important;
+  aspect-ratio:auto !important; min-height:0 !important; overflow:visible !important; border-radius:0 !important;
+}
+.doc-pages{ display:flex; flex-direction:column; gap:20px; padding:2px 2px 10px; }
+.doc-page{
+  position:relative; width:100%; background:#fff; border-radius:3px; overflow:hidden;
+  box-shadow:0 0 0 1px rgba(15,17,22,.06), 0 10px 28px -12px rgba(15,17,22,.28);
+}
+.doc-page svg{ display:block; width:100%; height:100%; }
+.doc-page-info{
+  margin-left:auto; font-size:11px; color:var(--muted); letter-spacing:.02em;
+  font-variant-numeric:tabular-nums; white-space:nowrap;
+}
+.doc-fit-note{
+  font-size:12px; line-height:1.45; color:#8a5a00; background:#fff7e6;
+  border:1px solid #f3dfb3; border-radius:6px; padding:9px 11px;
+}
+@media (max-width:1280px){
+  .preview-wrap{ max-height:none; overflow:visible; }
+}
+@media (max-width:600px){
+  .doc-page-info{ order:-1; width:100%; margin-left:0; }
+}
+
+@media print{
+  /* Document printing: only the engine's pages, one per sheet, no app chrome.
+     @page size is set live from Settings → Page size (docPrintPageStyle). */
+  .doc-page-info, .doc-fit-note{ display:none !important; }
+  .preview-wrap{ max-height:none !important; overflow:visible !important; padding:0 !important; }
+  .doc-pages{ display:block !important; gap:0 !important; padding:0 !important; }
+  .doc-page{
+    box-shadow:none !important; border-radius:0 !important; margin:0 !important;
+    aspect-ratio:auto !important; page-break-after:always; break-after:page; overflow:hidden;
+  }
+  .doc-page:last-child{ page-break-after:auto; break-after:auto; }
+
+  /* Insights printing (Download PDF on the Insights tab): one page, scaled to fit */
+  body.print-insights .view:not(#view-insights){ display:none !important; }
+  body.print-insights #view-insights{ display:block !important; }
+  body.print-insights #insightsContent{ zoom:.7; }
+  body.print-insights .ins-cal-day{ min-height:34px !important; }
+  body.print-insights #insightsContent .form-card{ display:block !important; break-inside:avoid; box-shadow:none !important; }
+  body.print-insights .ins-grid-2{ display:grid !important; }
+}
 </style>
 </head>
 <body>
@@ -1889,6 +1937,7 @@ input[type=file]{padding:6px;font-size:12px}
         <!-- PREVIEW -->
         <div class="preview-wrap">
           <div class="preview-actions">
+            <span class="doc-page-info" id="docPageInfo"></span>
             <button class="btn btn-primary" id="saveBtn">
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 2h8l2 2v10H3z"/><path d="M5 2v4h6V2M5 10h6"/></svg>
               Save
@@ -3003,7 +3052,7 @@ function applyDesign(){
   // apply layout class to .document
   const docEl = document.getElementById('document');
   if (docEl){
-    docEl.className = 'document doc-style-' + d.layout;
+    docEl.className = 'doc-pages';
   }
 }
 
@@ -3269,7 +3318,7 @@ function buildItemsTable(rows, cur){
 }
 
 function updatePreview(){
-  document.getElementById('document').innerHTML = renderDocument(current);
+  renderDocPreview();
   const t = calcTotals(current); const cur = current.currency;
   document.getElementById('t-subtotal').textContent = fmtMoney(t.subtotal, cur);
   document.getElementById('t-discount').textContent = '− ' + fmtMoney(t.discount, cur);
@@ -3371,510 +3420,737 @@ function bindForm(){
   f('convertToInvoiceBtn').onclick = convertCurrentToInvoice;
 }
 
-// Verify the PDF libraries are loaded. html2pdf.bundle includes both
-// html2canvas and jsPDF as globals (window.html2canvas, window.jspdf).
-async function ensureHtml2PdfReady(){
-  for (let i = 0; i < 50; i++){
-    if (typeof window.html2canvas === 'function' &&
-        window.jspdf && typeof window.jspdf.jsPDF === 'function'){
-      return true;
-    }
-    await new Promise(r => setTimeout(r, 100));
-  }
-  return false;
-}
-
-// Wait for fonts to finish loading. Without this, html2canvas captures
-// before custom fonts arrive and falls back to system fonts, producing
-// inconsistent renders between calls.
-async function ensureFontsReady(){
-  if (document.fonts && document.fonts.ready){
-    try { await document.fonts.ready; } catch (e){ /* best effort */ }
-  }
-  await new Promise(r => setTimeout(r, 80));
-}
-
-// Render a single DOM element to a canvas at A4 width using html2canvas.
-// Returns the canvas, or null on failure.
-async function renderElementToCanvas(el, width){
-  return await window.html2canvas(el, {
-    scale: 2,
-    useCORS: true,
-    letterRendering: true,
-    backgroundColor: '#ffffff',
-    width: width,
-    windowWidth: width,
-    logging: false
-  });
-}
-
-// Build a clone of the document positioned at viewport origin so html2canvas
-// can read valid layout coordinates. Returns { host, clone } — caller is
-// responsible for removing the host from DOM after capture.
-function createRenderHost(sourceEl, width){
-  const host = document.createElement('div');
-  host.id = 'pdfRenderHost';
-  host.style.cssText = [
-    'position:fixed',
-    'top:0','left:0',
-    'z-index:-1',                  // behind everything else
-    'width:' + width + 'px',
-    'background:#ffffff',
-    'pointer-events:none',
-    'opacity:1',
-    'overflow:visible'
-  ].join(';');
-  const clone = sourceEl.cloneNode(true);
-  const isStudio = clone.classList.contains('doc-style-studio');
-  clone.style.cssText = [
-    'width:' + width + 'px',
-    'box-sizing:border-box',
-    'background:#ffffff',
-    'box-shadow:none','border:none','border-radius:0','margin:0',
-    isStudio ? 'padding:0' : 'padding:48px 56px'
-  ].join(';');
-  host.appendChild(clone);
-  document.body.appendChild(host);
-  return { host, clone, isStudio };
-}
-
 // ============================================================
-// PDF EXPORT — strict 1-inch margins, A4 or Letter, multi-page
-// ============================================================
-// Page-size catalog. Each entry holds:
-//   • widthMm / heightMm  — for jsPDF (mm)
-//   • widthPx / heightPx  — for html2canvas (CSS pixels @ 96dpi)
-//   • A 1-inch margin = 25.4 mm = 96 px (at 96dpi).
-// Adding a new size is just a new entry here; the rest of the function
-// computes everything from these numbers.
-const PAGE_SIZES = {
-  letter: {
-    label:    'US Letter',
-    widthMm:  215.9, heightMm: 279.4,
-    widthPx:  816,   heightPx: 1056,
-    jsPdfFormat: 'letter'
-  },
-  a4: {
-    label:    'A4',
-    widthMm:  210, heightMm: 297,
-    widthPx:  794, heightPx: 1123,
-    jsPdfFormat: 'a4'
-  }
-};
-
-// 1 inch in pixels (at 96dpi) and in millimeters.
-const MARGIN_IN_PX = 96;
-const MARGIN_IN_MM = 25.4;
-
-// Page-number reserve (within the bottom margin) — we draw "Page X of Y"
-// inside the margin band, NOT in the content area, so this doesn't eat into
-// the printable region. 12px below the content edge, leaves ~12px above page edge.
-const PAGE_NUMBER_OFFSET_PX = 36;       // distance from content bottom to page-num text
-const PAGE_NUMBER_FONT_SIZE = 9;
-
-// Wait until html2canvas + jspdf are loaded and callable.
-async function ensureLibsReady(){
-  for (let i = 0; i < 50; i++){
-    if (typeof window.html2canvas === 'function' &&
-        window.jspdf && typeof window.jspdf.jsPDF === 'function'){
-      return true;
-    }
-    await new Promise(r => setTimeout(r, 100));
-  }
-  return false;
-}
-
-// Wait for fonts so the capture uses the right typefaces (not system fallbacks).
-async function ensureFontsLoaded(){
-  if (document.fonts && document.fonts.ready){
-    try { await document.fonts.ready; } catch (e){ /* best effort */ }
-  }
-  await new Promise(r => setTimeout(r, 80));
-}
-
-// Render an element to a canvas at the given CSS width. Returns a Canvas.
-async function renderToCanvas(el, widthPx){
-  return await window.html2canvas(el, {
-    scale: 2,                    // 2x for crisp text at print scale
-    useCORS: true,
-    letterRendering: true,
-    backgroundColor: '#ffffff',
-    width: widthPx,
-    windowWidth: widthPx,
-    logging: false
-  });
-}
-
-// Build a fresh off-canvas render host (positioned at viewport origin with
-// z-index:-1 so html2canvas can read valid coordinates but the user can't
-// see it). Returns the host element — caller is responsible for removing it.
-function buildRenderHost(widthPx){
-  const host = document.createElement('div');
-  host.className = 'pdfRenderHost';
-  host.style.cssText = [
-    'position:fixed','top:0','left:0','z-index:-1',
-    'width:' + widthPx + 'px',
-    'background:#ffffff','pointer-events:none','opacity:1','overflow:visible'
-  ].join(';');
-  document.body.appendChild(host);
-  return host;
-}
-
-// Export the current document as a multi-page PDF.
+// INVOYOU DOCUMENT ENGINE
+// ------------------------------------------------------------
+// One layout pass turns a document into a list of pages, each a list of
+// drawing operations (text, rules, fills, images) positioned in points on a
+// fixed page. Two small back-ends draw that same page list:
+//   • pageSVG()        → the on-screen preview and Print
+//   • buildPdfBytes()  → a native PDF with real, selectable, copyable text
+// No third-party libraries. Text uses the built-in PDF fonts (Helvetica,
+// Times) in WinAnsi encoding and is measured with the exact glyph widths a
+// PDF viewer uses, so line-wrapping and page breaks are identical on screen,
+// in print and in the exported file.
 //
-// Layout rules (locked):
-//   • 1-inch (25.4mm / 96px) margin on top, bottom, left, right of EVERY page.
-//   • Header at top of every page (inside the margin).
-//   • Footer at bottom of every page (inside the margin).
-//   • Body content flows between header and footer.
-//   • "Page X of Y" centered at the bottom margin band.
-//   • Page breaks fall on safe boundaries: between rows (never mid-row),
-//     around totals (which stay together), and so notes/payment-terms don't
-//     get orphaned.
-async function exportPDF({ silent = false } = {}){
-  if (!current){
-    if (!silent) toast('Open a document first');
-    return null;
+// Page rules
+//   • 1-inch (72pt) margin on all four sides; nothing is drawn in it.
+//   • Page 1: logo + business name + address + contact at the top, then the
+//     client block, then every line item. Line items never continue onto a
+//     second page: if they don't fit, row spacing and type size step down
+//     until they do. Totals, terms and signature follow and may flow on.
+//   • Pages 2+: a slim running header (business name + document number).
+//     No addresses repeat.
+//   • Every page: small footer line with document reference and Page X of Y.
+// ============================================================
+const FONT_METRICS = {"H":[278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,278,278,584,584,584,556,1015,667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,278,278,278,469,556,333,556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,334,260,334,584,0,556,0,222,556,333,1000,556,556,333,1000,667,333,1000,0,611,0,0,222,222,333,333,350,556,1000,333,1000,500,333,944,0,500,667,278,333,556,556,556,556,260,556,333,737,370,556,584,333,737,333,400,584,333,333,333,556,537,278,333,333,365,556,834,834,834,611,667,667,667,667,667,667,1000,722,667,667,667,667,278,278,278,278,722,722,778,778,778,778,778,584,778,722,722,722,722,667,667,611,556,556,556,556,556,556,889,500,556,556,556,556,278,278,278,278,556,556,556,556,556,556,556,584,611,556,556,556,556,500,556,500],"HB":[278,333,474,556,556,889,722,238,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,333,333,584,584,584,611,975,722,722,722,722,667,611,778,722,278,556,722,611,833,722,778,667,778,722,667,611,722,667,944,667,667,611,333,278,333,584,556,333,556,611,556,611,556,333,611,611,278,278,556,278,889,611,611,611,611,389,556,333,611,556,778,556,556,500,389,280,389,584,0,556,0,278,556,500,1000,556,556,333,1000,667,333,1000,0,611,0,0,278,278,500,500,350,556,1000,333,1000,556,333,944,0,500,667,278,333,556,556,556,556,280,556,333,737,370,556,584,333,737,333,400,584,333,333,333,611,556,278,333,333,365,556,834,834,834,611,722,722,722,722,722,722,1000,722,667,667,667,667,278,278,278,278,722,722,778,778,778,778,778,584,778,722,722,722,722,667,667,611,556,556,556,556,556,556,889,556,556,556,556,556,278,278,278,278,611,611,611,611,611,611,611,584,611,611,611,611,611,556,611,556],"T":[250,333,408,500,500,833,778,180,333,333,500,564,250,333,250,278,500,500,500,500,500,500,500,500,500,500,278,278,564,564,564,444,921,722,667,667,722,611,556,722,722,333,389,722,611,889,722,722,556,722,667,556,611,722,722,944,722,722,611,333,278,333,469,500,333,444,500,444,500,444,333,500,500,278,278,500,278,778,500,500,500,500,333,389,278,500,500,722,500,500,444,480,200,480,541,0,500,0,333,500,444,1000,500,500,333,1000,556,333,889,0,611,0,0,333,333,444,444,350,500,1000,333,980,389,333,722,0,444,722,250,333,500,500,500,500,200,500,333,760,276,500,564,333,760,333,400,564,300,300,333,500,453,250,333,300,310,500,750,750,750,444,722,722,722,722,722,722,889,667,611,611,611,611,333,333,333,333,722,722,722,722,722,722,722,564,722,722,722,722,722,722,556,500,444,444,444,444,444,444,667,444,444,444,444,444,278,278,278,278,500,500,500,500,500,500,500,564,500,500,500,500,500,500,500,500],"TB":[250,333,555,500,500,1000,833,278,333,333,500,570,250,333,250,278,500,500,500,500,500,500,500,500,500,500,333,333,570,570,570,500,930,722,667,722,722,667,611,778,778,389,500,778,667,944,722,778,611,778,722,556,667,722,722,1000,722,722,667,333,278,333,581,500,333,500,556,444,556,444,333,500,556,278,333,556,278,833,556,500,556,556,444,389,333,556,500,722,500,500,444,394,220,394,520,0,500,0,333,500,500,1000,500,500,333,1000,556,333,1000,0,667,0,0,333,333,500,500,350,500,1000,333,1000,389,333,722,0,444,722,250,333,500,500,500,500,220,500,333,747,300,500,570,333,747,333,400,570,300,300,333,556,540,250,333,300,330,500,750,750,750,500,722,722,722,722,722,722,1000,722,667,667,667,667,389,389,389,389,722,722,778,778,778,778,778,570,778,722,722,722,722,722,611,556,500,500,500,500,500,500,722,444,444,444,444,444,278,278,278,278,500,556,500,500,500,500,500,570,500,556,556,556,556,500,556,500]};
+const FONT_PS  = { H:'Helvetica', HB:'Helvetica-Bold', T:'Times-Roman', TB:'Times-Bold' };
+const FONT_CSS = {
+  H:"Helvetica, Arial, 'Liberation Sans', 'Nimbus Sans', sans-serif",
+  T:"'Times New Roman', Times, 'Liberation Serif', 'Nimbus Roman', serif"
+};
+const WINANSI_EXTRA = {'€':128,'‚':130,'ƒ':131,'„':132,'…':133,'†':134,'‡':135,'ˆ':136,'‰':137,'Š':138,'‹':139,'Œ':140,'Ž':142,'‘':145,'’':146,'“':147,'”':148,'•':149,'–':150,'—':151,'˜':152,'™':153,'š':154,'›':155,'œ':156,'ž':158,'Ÿ':159};
+const CHAR_FALLBACK = {'\u2212':'-','\u2192':'->','\u2190':'<-','\u2116':'No.','\u00A0':' ','\u2002':' ','\u2003':' ','\u2009':' ','\u202F':' ','\u2010':'-','\u2011':'-','\u2012':'-','\u2248':'~','\u2264':'<=','\u2265':'>='};
+const PAGE_PT = { letter:{ w:612, h:792 }, a4:{ w:595.28, h:841.89 } };
+const DOC_MARGIN = 72;   // 1 inch
+
+// Reduce any string to characters the standard PDF fonts can draw.
+function normText(s){
+  s = s == null ? '' : String(s);
+  let out = '';
+  for (const ch of s){
+    if (CHAR_FALLBACK[ch] !== undefined){ out += CHAR_FALLBACK[ch]; continue; }
+    const cp = ch.codePointAt(0);
+    if (cp === 10){ out += '\n'; continue; }
+    if (cp === 9){ out += '  '; continue; }
+    if (cp < 32 || cp === 127) continue;
+    if (cp < 127 || (cp >= 161 && cp <= 255) || WINANSI_EXTRA[ch]){ out += ch; continue; }
+    if ((cp >= 0x2600 && cp <= 0x27BF) || cp >= 0x1F000 || (cp >= 0xFE00 && cp <= 0xFE0F) || cp === 0x200D) continue;   // emoji / pictographs: drop
+    out += '?';
   }
-  const source = document.getElementById('document');
-  if (!source){
-    if (!silent) toast('Nothing to export');
-    return null;
+  return out;
+}
+function winCode(ch){
+  const cp = ch.charCodeAt(0);
+  if ((cp >= 32 && cp < 127) || (cp >= 160 && cp <= 255)) return cp;
+  return WINANSI_EXTRA[ch] || 63;
+}
+function textW(str, font, size, cs){
+  let w = 0;
+  for (const ch of str) w += FONT_METRICS[font][winCode(ch) - 32] || 0;
+  return w * size / 1000 + (cs || 0) * Math.max(0, str.length - 1);
+}
+function wrapLines(text, font, size, maxW, cs){
+  const out = [];
+  normText(text).split('\n').forEach(para => {
+    para = para.replace(/\s+$/, '');
+    if (!para.trim()){ out.push(''); return; }
+    let line = '';
+    for (let w of para.split(/ +/)){
+      if (!w) continue;
+      const trial = line ? line + ' ' + w : w;
+      if (textW(trial, font, size, cs) <= maxW){ line = trial; continue; }
+      if (line){ out.push(line); line = ''; }
+      while (w.length > 1 && textW(w, font, size, cs) > maxW){   // break over-long words
+        let i = 1;
+        while (i < w.length - 1 && textW(w.slice(0, i + 1), font, size, cs) <= maxW) i++;
+        out.push(w.slice(0, i)); w = w.slice(i);
+      }
+      line = w;
+    }
+    if (line) out.push(line);
+  });
+  return out;
+}
+
+// ---- colour helpers ----
+function hexRgb(h){
+  h = String(h || '#000000').replace('#', '');
+  if (h.length === 3) h = h.split('').map(c => c + c).join('');
+  const n = parseInt(h.slice(0, 6), 16);
+  return isNaN(n) ? [0,0,0] : [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+function rgbHex(a){ return '#' + a.map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join(''); }
+function mixHex(a, b, t){ const A = hexRgb(a), B = hexRgb(b); return rgbHex(A.map((v, i) => v + (B[i] - v) * t)); }
+function lum(h){
+  const [r,g,b] = hexRgb(h).map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+function onColor(bg){ return lum(bg) > 0.4 ? '#15171b' : '#ffffff'; }
+function docPalette(){
+  const d = state.design;
+  const c = d.useCustom ? { accent:d.customAccent, ink:d.customInk } : (COLORS[d.color] || COLORS.sienna);
+  let ink = c.ink || '#16181d';
+  if (lum(ink) > 0.3) ink = '#16181d';               // body text must stay dark on white paper
+  const accent = c.accent || '#3646D3';
+  return {
+    ink, accent,
+    onAccent: onColor(accent),
+    accentText: lum(accent) > 0.45 ? mixHex(accent, '#000000', 0.5) : accent,   // accent-coloured text stays readable
+    muted:'#5b6270', faint:'#8b919c', hair:'#dcdfe4', zebra:'#f5f6f8', panel:'#f4f5f7'
+  };
+}
+
+// ---- image cache (logo / signature). Layout needs natural sizes. ----
+const DOC_IMG = {};
+function docImage(src){
+  if (!src) return null;
+  const hit = DOC_IMG[src];
+  if (hit) return hit.w ? hit : null;
+  DOC_IMG[src] = { w:0, h:0 };
+  const im = new Image();
+  im.onload  = () => { DOC_IMG[src] = { w:im.naturalWidth || 1, h:im.naturalHeight || 1 }; if (typeof current !== 'undefined' && current) renderDocPreview(); };
+  im.onerror = () => { DOC_IMG[src] = { w:0, h:0, failed:true }; };
+  im.src = src;
+  return null;
+}
+function waitForDocImages(srcs){
+  const started = Date.now();
+  return Promise.all(srcs.filter(Boolean).map(src => new Promise(res => {
+    docImage(src);
+    const tick = () => {
+      const h = DOC_IMG[src];
+      if ((h && (h.w || h.failed)) || Date.now() - started > 4000) res(); else setTimeout(tick, 40);
+    };
+    tick();
+  })));
+}
+
+// ============================================================
+// LAYOUT
+// ============================================================
+function layoutDocument(doc){
+  const S = state.settings || {}, B = state.business || {};
+  const sizeKey = S.pageSize === 'a4' ? 'a4' : 'letter';
+  const PW = PAGE_PT[sizeKey].w, PH = PAGE_PT[sizeKey].h;
+  const M = DOC_MARGIN, L = M, R = PW - M, CW = R - L, TOP = M;
+  const FOOTER_H = 26;
+  const BOTTOM = PH - M - FOOTER_H;                   // lowest point body content may reach
+  const style = ['studio','classic','modern','editorial'].includes(state.design.layout) ? state.design.layout : 'studio';
+  const C = docPalette();
+  const FB = style === 'editorial' ? 'TB' : 'HB';     // heading font
+  const lined = style !== 'classic';                  // Classic uses no rules at all
+  const nameScale = Math.max(0.6, Math.min(1.3, (B.nameScale || 100) / 100));
+  const logoScale = Math.max(0.5, Math.min(2, (B.logoScale || 100) / 100));
+
+  const t = calcTotals(doc);
+  const cur = doc.currency;
+  const sym = normText(CURRENCY[cur] || cur || '');
+  const money = n => normText(fmtMoney(n, cur));
+  const isInvLike = doc.type === 'invoice' || doc.type === 'proforma';
+  const typeLabel = doc.type === 'invoice' ? 'Invoice' : doc.type === 'proforma' ? 'Pro Forma Invoice' : 'Quotation';
+  const grandLabel = isInvLike ? 'Amount due' : 'Total';
+  const docNo = normText(doc.number || '');
+  const bizName = normText(B.name || '');
+
+  const pages = []; const warnings = [];
+  let ops = null, y = 0, freshPage = false;
+  const newPage = () => { ops = []; pages.push({ ops }); };
+  const baseline = (top, lh, size) => top + lh / 2 + size * 0.34;
+  const text = (s, x, by, o = {}) => {
+    s = normText(s); if (!s.trim()) return;
+    ops.push({ t:'text', s, x, y:by, f:o.f || 'H', size:o.size || 9, color:o.color || C.ink, align:o.align || 'left', cs:o.cs || 0 });
+  };
+  const rect  = (x, top, w, h, fill) => ops.push({ t:'rect', x, y:top, w, h, fill });
+  const rule  = (x1, yy, x2, color, w) => ops.push({ t:'line', x1, y1:yy, x2, y2:yy, w:w || 0.6, color:color || C.hair });
+  const image = (src, x, top, w, h, bg) => ops.push({ t:'img', src, x, y:top, w, h, bg:bg || '#ffffff' });
+  const para  = (lines, x, top, o) => {
+    const lh = o.lh || o.size * 1.42;
+    lines.forEach((ln, i) => text(ln, x, baseline(top + i * lh, lh, o.size), o));
+    return top + lines.length * lh;
+  };
+  const label = (s, x, top, o = {}) => text(s.toUpperCase(), x, baseline(top, 11, 6.8), { f:'HB', size:6.8, cs:1.1, color:o.color || C.muted, align:o.align || 'left' });
+  const fitSize = (s, font, size, maxW, min) => { while (size > (min || 6) && textW(s, font, size) > maxW) size -= 0.25; return size; };
+
+  // ---------- brand mark: uploaded logo, or monogram fallback ----------
+  const logoSrc = B.logo || null, logoInfo = docImage(logoSrc);
+  function drawMark(x, top, align, onBand){
+    if (logoSrc && logoInfo){
+      const maxH = 42 * logoScale, maxW = 190 * logoScale;
+      let h = maxH, w = logoInfo.w * h / logoInfo.h;
+      if (w > maxW){ w = maxW; h = logoInfo.h * w / logoInfo.w; }
+      image(logoSrc, align === 'center' ? x - w / 2 : align === 'right' ? x - w : x, top, w, h, onBand ? C.accent : '#ffffff');
+      return h;
+    }
+    const mono = normText(B.monogram || '').slice(0, 3).toUpperCase();
+    if (!mono.trim()) return 0;
+    const r = 15 * logoScale, cx = align === 'center' ? x : align === 'right' ? x - r : x + r, cy = top + r;
+    let fg;
+    if (style === 'classic'){ ops.push({ t:'circle', cx, cy, r, stroke:C.ink, w:0.9 }); fg = C.ink; }
+    else if (onBand){ ops.push({ t:'circle', cx, cy, r, fill:C.onAccent }); fg = C.accent; }
+    else { ops.push({ t:'circle', cx, cy, r, fill:C.ink }); fg = '#ffffff'; }
+    const fs = fitSize(mono, 'HB', 10.5 * logoScale, r * 1.6, 6);
+    text(mono, cx, cy + fs * 0.35, { f:'HB', size:fs, color:fg, align:'center' });
+    return r * 2;
   }
 
-  // Lock buttons during render so the user can't fire two captures in parallel.
-  const exportBtnEl = document.getElementById('exportPdfBtn');
-  const printBtnEl  = document.getElementById('printBtn');
-  const origExportText = exportBtnEl ? exportBtnEl.textContent.trim() : '';
-  if (exportBtnEl && !silent){
-    exportBtnEl.disabled = true;
-    exportBtnEl.textContent = 'Exporting…';
-  }
-  if (printBtnEl && !silent) printBtnEl.disabled = true;
-
-  // 1) Libraries + fonts ready
-  if (!await ensureLibsReady()){
-    if (!silent) toast('PDF library failed to load — check your connection');
-    if (exportBtnEl && !silent){ exportBtnEl.disabled = false; exportBtnEl.textContent = origExportText; }
-    if (printBtnEl && !silent) printBtnEl.disabled = false;
-    return null;
-  }
-  await ensureFontsLoaded();
-
-  // 2) Resolve page size from settings (default: letter)
-  const sizeKey = (state.settings && state.settings.pageSize) === 'a4' ? 'a4' : 'letter';
-  const PAGE = PAGE_SIZES[sizeKey];
-
-  // Printable region (page minus 1-inch margins on each side)
-  const PRINT_WIDTH_PX  = PAGE.widthPx  - 2 * MARGIN_IN_PX;
-  const PRINT_HEIGHT_PX = PAGE.heightPx - 2 * MARGIN_IN_PX;
-
-  // 3) Build a clone of the document at PRINT WIDTH (NOT page width — the
-  //    document itself already has 96px padding internally, so by capturing
-  //    the document at print width we capture the full page-equivalent area.
-  //    Wait — the document's own internal padding is 96px (1in), and the
-  //    body content lives inside that. We want to render JUST the body's
-  //    contents (without the document's white margin), then position the
-  //    captured image at the 1in offset on the PDF page.)
-  //
-  // Strategy: render the document at PAGE WIDTH (so its built-in 96px
-  // padding fills the margin areas), and the inner content fills the
-  // printable region. Then when we place slices on the PDF page, we
-  // position them at (0, 0) since the cloned document already includes
-  // the white margins.
-  //
-  // No — that doesn't work because we ALSO want to repeat the header
-  // on every page (at the TOP margin band, not floating below it).
-  //
-  // Cleaner approach:
-  //   • Render header AT PRINT WIDTH (no document padding around it)
-  //   • Render footer AT PRINT WIDTH
-  //   • Render the body's "middle section" AT PRINT WIDTH (also no padding)
-  //   • Position each on the PDF at (MARGIN, computed-y) so margins are
-  //     enforced uniformly.
-  //
-  // To render only the content (not the document's outer 1in padding) we
-  // clone the document and FORCE its padding to 0, then render. The
-  // document's inner sections retain their own internal spacing.
-
-  const headerEl = source.querySelector('.doc-head');
-  const sigBlockEl = source.querySelector('.doc-sigblock');
-  if (!headerEl){
-    if (!silent) toast('Document is missing a header — cannot export');
-    if (exportBtnEl && !silent){ exportBtnEl.disabled = false; exportBtnEl.textContent = origExportText; }
-    if (printBtnEl && !silent) printBtnEl.disabled = false;
-    return null;
-  }
-
-  const renderHost = buildRenderHost(PRINT_WIDTH_PX);
-
-  try {
-    // ---- HEADER clone (just .doc-head, rendered at print width) ----
-    // We clone it inside a wrapper that mimics the document's class so
-    // CSS scoped to ".doc-style-X" still applies. The wrapper has no padding.
-    const headerWrapper = document.createElement('div');
-    headerWrapper.className = source.className;   // copies "document doc-style-studio" etc.
-    headerWrapper.style.cssText = 'padding:0;background:#fff;width:' + PRINT_WIDTH_PX + 'px;box-sizing:border-box;';
-    const headerClone = headerEl.cloneNode(true);
-    headerClone.style.margin = '0';
-    headerWrapper.appendChild(headerClone);
-    renderHost.appendChild(headerWrapper);
-
-    // ---- FOOTER clone (signature/contact block) ----
-    const footerWrapper = document.createElement('div');
-    footerWrapper.className = source.className;
-    footerWrapper.style.cssText = 'padding:0;background:#fff;width:' + PRINT_WIDTH_PX + 'px;box-sizing:border-box;margin-top:40px;';
-    let footerClone = null;
-    if (sigBlockEl){
-      footerClone = sigBlockEl.cloneNode(true);
-      footerClone.style.marginTop = '0';
-      footerClone.style.paddingTop = '12px';
-      footerClone.style.paddingBottom = '0';
-      // Classic strips all dividers — keep that promise in the PDF too.
-      // Other layouts benefit from a thin separator above the footer to
-      // separate signature/contact info from the body content above.
-      const isClassic = source.classList.contains('doc-style-classic');
-      footerClone.style.borderTop = isClassic ? 'none' : '1px solid var(--doc-line)';
-      footerWrapper.appendChild(footerClone);
-    }
-    renderHost.appendChild(footerWrapper);
-
-    // ---- BODY clone — document with header AND sigblock removed ----
-    // What's left: BILL TO + meta + items table + totals + notes/payment-terms.
-    const bodyWrapper = document.createElement('div');
-    bodyWrapper.className = source.className;
-    bodyWrapper.style.cssText = 'padding:0;background:#fff;width:' + PRINT_WIDTH_PX + 'px;box-sizing:border-box;margin-top:40px;';
-    const bodyContentClone = source.cloneNode(true);
-    bodyContentClone.style.padding = '0';
-    bodyContentClone.style.width = PRINT_WIDTH_PX + 'px';
-    const bcHead = bodyContentClone.querySelector('.doc-head');
-    if (bcHead) bcHead.remove();
-    const bcSig = bodyContentClone.querySelector('.doc-sigblock');
-    if (bcSig) bcSig.remove();
-    // Move the bodyContentClone's contents directly into bodyWrapper so we
-    // don't have a nested .document with double styles.
-    while (bodyContentClone.firstChild){
-      bodyWrapper.appendChild(bodyContentClone.firstChild);
-    }
-    renderHost.appendChild(bodyWrapper);
-
-    // Wait two RAFs so the browser computes layout on all three clones.
-    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-
-    // ---- Capture all three to canvases ----
-    const headerCanvas = await renderToCanvas(headerWrapper, PRINT_WIDTH_PX);
-    const headerHpx    = headerCanvas.height / 2;   // 2x scale → divide
-
-    const bodyCanvas = await renderToCanvas(bodyWrapper, PRINT_WIDTH_PX);
-    const bodyHpx    = bodyCanvas.height / 2;
-
-    let footerCanvas = null;
-    let footerHpx    = 0;
-    if (footerClone){
-      footerCanvas = await renderToCanvas(footerWrapper, PRINT_WIDTH_PX);
-      footerHpx    = footerCanvas.height / 2;
-    }
-
-    // ---- Compute safe page-break Y positions in body coordinates ----
-    // The body wrapper hosts the actual elements, so we can walk it for breakpoints.
-    const bodyRect = bodyWrapper.getBoundingClientRect();
-    const safeYs = [];
-    // Safe boundary = BOTTOM of these elements (i.e., we can break AFTER them)
-    bodyWrapper.querySelectorAll('.doc-items tbody tr, .doc-totals-row, .doc-footer > *, .doc-billto').forEach(el => {
-      const r = el.getBoundingClientRect();
-      const yBottom = r.bottom - bodyRect.top;
-      if (yBottom > 0 && yBottom <= bodyHpx) safeYs.push(yBottom);
-    });
-    safeYs.push(bodyHpx);
-    safeYs.sort((a,b) => a-b);
-    // De-dupe near-equal Ys (within 2px)
-    const dedupedSafeYs = safeYs.filter((y, i) => i === 0 || y - safeYs[i-1] > 2);
-
-    // Also find the table header's BOTTOM position — we use this to ensure
-    // the header is never orphaned (visible without any body rows below it).
-    let tableHeaderBottomY = -1;
-    const theadEl = bodyWrapper.querySelector('.doc-items thead');
-    if (theadEl){
-      const r = theadEl.getBoundingClientRect();
-      tableHeaderBottomY = r.bottom - bodyRect.top;
-    }
-    // And the FIRST table row's bottom — if the page break falls between
-    // the header and the first row, we'd orphan the header. Push the break
-    // to BEFORE the table header instead.
-    let firstRowBottomY = -1;
-    const firstRow = bodyWrapper.querySelector('.doc-items tbody tr');
-    if (firstRow){
-      const r = firstRow.getBoundingClientRect();
-      firstRowBottomY = r.bottom - bodyRect.top;
-    }
-    // The "table-start" Y is the TOP of the items table (where the thead begins).
-    let tableTopY = -1;
-    const itemsTable = bodyWrapper.querySelector('.doc-items');
-    if (itemsTable){
-      const r = itemsTable.getBoundingClientRect();
-      tableTopY = r.top - bodyRect.top;
-    }
-
-    // ---- Plan pages ----
-    // Per-page body height = print height - header height - footer height - footer gap - page-num reserve
-    const HEADER_TO_BODY_GAP = 14;    // px between header and body content on each page
-    const BODY_TO_FOOTER_GAP = 18;
-    const PER_PAGE_BODY_AVAIL = PRINT_HEIGHT_PX
-      - headerHpx - HEADER_TO_BODY_GAP
-      - (footerCanvas ? (footerHpx + BODY_TO_FOOTER_GAP) : 0);
-
-    const HARD_LIMIT = 50;
-    const pageRanges = [];
-    let cursor = 0;
-
-    while (cursor < bodyHpx && pageRanges.length < HARD_LIMIT){
-      const limit = Math.min(cursor + PER_PAGE_BODY_AVAIL, bodyHpx);
-
-      // If everything remaining fits on this page, take it all.
-      if (limit >= bodyHpx){
-        pageRanges.push({ from: cursor, to: bodyHpx });
-        cursor = bodyHpx;
-        break;
-      }
-
-      // Find the largest safe Y in (cursor, limit].
-      let best = -1;
-      for (const y of dedupedSafeYs){
-        if (y > cursor && y <= limit) best = y;
-        if (y > limit) break;
-      }
-
-      // If best is between tableHeaderBottom and firstRowBottom we'd orphan
-      // the table header. Pull break back to BEFORE the table top instead.
-      if (best > tableHeaderBottomY && best <= firstRowBottomY &&
-          tableTopY > cursor){
-        // Find the largest safe Y at or below tableTopY
-        let alt = -1;
-        for (const y of dedupedSafeYs){
-          if (y > cursor && y <= tableTopY) alt = y;
-          if (y > tableTopY) break;
-        }
-        if (alt > cursor) best = alt;
-        else best = tableTopY;   // hard-break right before the table
-      }
-
-      // Failsafe: if we found no break point, hard-cut at limit.
-      // Also ensure we advance by at least 100px per loop iteration.
-      if (best <= cursor + 50) best = limit;
-
-      pageRanges.push({ from: cursor, to: best });
-      cursor = best;
-    }
-
-    // ---- Assemble jsPDF document ----
-    const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF({
-      unit: 'mm',
-      format: PAGE.jsPdfFormat,
-      orientation: 'portrait',
-      compress: true
-    });
-
-    const pxToMm = (px) => px * (PAGE.widthMm / PAGE.widthPx);
-
-    // Header position: at top margin (MARGIN_IN_MM from top edge)
-    // Body position:   header bottom + HEADER_TO_BODY_GAP
-    // Footer position: bottom margin (MARGIN_IN_MM from bottom edge)
-
-    const headerImg = headerCanvas.toDataURL('image/jpeg', 0.95);
-    const headerHmm = pxToMm(headerHpx);
-
-    let footerImg = null;
-    let footerHmm = 0;
-    if (footerCanvas){
-      footerImg = footerCanvas.toDataURL('image/jpeg', 0.95);
-      footerHmm = pxToMm(footerHpx);
-    }
-
-    for (let i = 0; i < pageRanges.length; i++){
-      if (i > 0) pdf.addPage();
-      const { from, to } = pageRanges[i];
-      const pageNum = i + 1;
-      const totalPages = pageRanges.length;
-
-      // Draw header at top margin (NOT bleed; inside the 1in margin band)
-      pdf.addImage(
-        headerImg, 'JPEG',
-        MARGIN_IN_MM, MARGIN_IN_MM,
-        PAGE.widthMm - 2 * MARGIN_IN_MM, headerHmm
-      );
-
-      // Draw body slice
-      const bodySliceHpx = to - from;
-      if (bodySliceHpx > 0){
-        // Cut a slice of the body canvas
-        const tmp = document.createElement('canvas');
-        tmp.width  = bodyCanvas.width;
-        tmp.height = Math.ceil(bodySliceHpx * 2);
-        const ctx = tmp.getContext('2d');
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, tmp.width, tmp.height);
-        ctx.drawImage(
-          bodyCanvas,
-          0, from * 2,
-          bodyCanvas.width, bodySliceHpx * 2,
-          0, 0,
-          tmp.width, tmp.height
-        );
-        const sliceImg = tmp.toDataURL('image/jpeg', 0.95);
-        pdf.addImage(
-          sliceImg, 'JPEG',
-          MARGIN_IN_MM,
-          MARGIN_IN_MM + headerHmm + pxToMm(HEADER_TO_BODY_GAP),
-          PAGE.widthMm - 2 * MARGIN_IN_MM,
-          pxToMm(bodySliceHpx)
-        );
-      }
-
-      // Draw footer at bottom margin (every page)
-      if (footerImg){
-        const footerYmm = PAGE.heightMm - MARGIN_IN_MM - footerHmm;
-        pdf.addImage(
-          footerImg, 'JPEG',
-          MARGIN_IN_MM, footerYmm,
-          PAGE.widthMm - 2 * MARGIN_IN_MM, footerHmm
-        );
-      }
-
-      // Page number — centered in the bottom MARGIN band, NOT in the printable area.
-      // Position 8mm from the bottom edge so it's clearly outside the content.
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(PAGE_NUMBER_FONT_SIZE);
-      pdf.setTextColor(120, 120, 128);
-      pdf.text(
-        'Page ' + pageNum + ' of ' + totalPages,
-        PAGE.widthMm / 2,
-        PAGE.heightMm - 10,
-        { align: 'center' }
-      );
-    }
-
-    const filename = (current.number || 'document') + '.pdf';
-    let result = null;
-    if (silent){
-      result = pdf.output('blob');
+  // ---------- business identity (compact) ----------
+  const addrLines = normText(B.address || '').split('\n').map(s => s.trim()).filter(Boolean);
+  const contactBits = [B.email, B.phone, B.website].map(v => normText(v || '').trim()).filter(Boolean);
+  const taxLine = (B.vatNumber || '').trim() ? 'Tax / VAT No. ' + normText(B.vatNumber) : '';
+  // Address + contact. list:true → one item per line (narrow columns);
+  // otherwise address joins with commas and contact with dots, wrapped.
+  function bizDetails(x, top, w, align, o = {}){
+    const soft = o.soft || C.muted, sz = 8.3, lh = 11.6;
+    const put = (s, yy) => para(wrapLines(s, 'H', sz, w), x, yy, { size:sz, lh, color:soft, align });
+    let yy = top;
+    if (o.list){
+      addrLines.forEach(l => { yy = put(l, yy); });
+      if (addrLines.length && contactBits.length) yy += 3;
+      contactBits.forEach(l => { yy = put(l, yy); });
     } else {
-      pdf.save(filename);
-      toast('PDF downloaded');
+      if (addrLines.length) yy = put(addrLines.join(', '), yy);
+      if (contactBits.length) yy = put(contactBits.join('   ·   '), yy);
     }
-    return result;
+    if (taxLine) yy = put(taxLine, yy);
+    return yy;
+  }
+  function bizBlock(x, top, w, align, o = {}){
+    const color = o.color || C.ink, soft = o.soft || C.muted;
+    const nSize = (o.nameSize || 16) * nameScale, nFont = o.nameFont || FB;
+    let yy = para(wrapLines(bizName, nFont, nSize, w, o.nameCs), x, top, { f:nFont, size:nSize, lh:nSize * 1.16, color, align, cs:o.nameCs });
+    if ((B.tagline || '').trim()){
+      yy += 2;
+      yy = para(wrapLines(normText(B.tagline).toUpperCase(), 'H', 6.6, w, 1), x, yy, { size:6.6, lh:9.6, color:soft, align, cs:1 });
+    }
+    if (o.details === false) return yy;
+    return bizDetails(x, yy + 6, w, align, { soft });
+  }
 
+  // ---------- document facts ----------
+  const numLabel = doc.type === 'invoice' ? 'Invoice no.' : doc.type === 'proforma' ? 'Pro forma no.' : 'Quotation no.';
+  const dateRows = [['Issue date', normText(fmtDate(doc.issueDate))], [doc.type === 'invoice' ? 'Due date' : 'Valid until', normText(fmtDate(doc.dueDate))]];
+  if (isInvLike && doc.clientPo && doc.clientPo.trim()) dateRows.push(['PO reference', normText(doc.clientPo.trim())]);
+  // Label / value pairs. xRight given → right-aligned block; else a column [x, x+w].
+  function metaBlock(xRight, top, rows, x0){
+    const size = 8.4, lh = 14.2;
+    const valW = Math.max(...rows.map(r => textW(r[1], 'HB', size)));
+    rows.forEach(([k, v], i) => {
+      const bl = baseline(top + i * lh, lh, size);
+      if (x0 != null) text(k, x0, bl, { size, color:C.muted });
+      else text(k, xRight - valW - 14, bl, { size, color:C.muted, align:'right' });
+      text(v, xRight, bl, { f:'HB', size, align:'right' });
+    });
+    return top + rows.length * lh;
+  }
+
+  // ---------- client block (compact) ----------
+  function clientBlock(x, top, w, o = {}){
+    const c = doc.client || {};
+    label(o.label || (isInvLike ? 'Bill to' : 'Prepared for'), x, top);
+    let yy = top + 16;
+    yy = para(wrapLines(normText(c.name || '—'), FB, 10.6, w), x, yy, { f:FB, size:10.6, lh:13.5 });
+    yy += 1;
+    const sz = 8.3, lh = 11.6;
+    const put = (s, col) => { yy = para(wrapLines(s, 'H', sz, w), x, yy, { size:sz, lh, color:col || C.ink }); };
+    const nc = s => normText(s || '').trim();
+    if (nc(c.contact)) put(nc(c.contact));
+    const ep = [nc(c.email), nc(c.phone)].filter(Boolean);
+    if (ep.length === 2 && textW(ep.join(' · '), 'H', sz) <= w) put(ep.join(' · ')); else ep.forEach(v => put(v));
+    if (nc(c.website)) put(nc(c.website));
+    const addr = normText(c.address || '').split('\n').map(s => s.trim()).filter(Boolean);
+    if (addr.length) put(addr.join(', '), C.muted);
+    return yy;
+  }
+  // Amount summary (used beside the client block in Modern / Editorial)
+  function amountSummary(xRight, top, w, serif){
+    label((isInvLike ? 'Amount due' : 'Total') + ' (' + cur + ')', xRight, top, { align:'right' });
+    const amt = money(t.total), f = serif ? 'TB' : 'HB';
+    const s = fitSize(amt, f, serif ? 22 : 20, w, 11);
+    text(amt, xRight, baseline(top + 15, s * 1.2, s), { f, size:s, align:'right' });
+    return top + 15 + s * 1.2;
+  }
+
+  // ---------- page-1 headers, one per look ----------
+  // Studio: colour band (logo, name, type | amount due), then From · Bill to · Details
+  function headStudio(){
+    const padX = 22, padY = 18, pocketW = Math.min(200, CW * 0.36), leftW = CW - pocketW - padX * 2;
+    const start = ops.length;
+    const soft = mixHex(C.onAccent, C.accent, 0.3);
+    let yy = TOP + padY;
+    const mh = drawMark(L + padX, yy, 'left', true); if (mh) yy += mh + 9;
+    yy = bizBlock(L + padX, yy, leftW, 'left', { color:C.onAccent, soft, nameSize:17, details:false });
+    yy += 7;
+    text(typeLabel.toUpperCase(), L + padX, baseline(yy, 11, 7.4), { f:'HB', size:7.4, cs:2, color:C.onAccent });
+    yy += 11;
+    const bandH = Math.max(yy + padY - TOP, 84);
+    const pocket = mixHex(C.accent, '#000000', 0.14), onP = onColor(pocket);
+    ops.splice(start, 0,
+      { t:'rect', x:L, y:TOP, w:CW, h:bandH, fill:C.accent },
+      { t:'rect', x:R - pocketW, y:TOP, w:pocketW, h:bandH, fill:pocket });
+    const cy = TOP + bandH / 2;
+    text(((isInvLike ? 'Amount due' : 'Total') + ' (' + cur + ')').toUpperCase(), R - 18, cy - 9, { f:'HB', size:6.6, cs:1.2, color:onP, align:'right' });
+    const amt = money(t.total), as = fitSize(amt, 'HB', 20, pocketW - 36, 10);
+    text(amt, R - 18, cy + 13, { f:'HB', size:as, color:onP, align:'right' });
+    // three columns
+    const top = TOP + bandH + 22, gap = 18, colW = (CW - gap * 2) / 3;
+    label('From', L, top);
+    const a = bizDetails(L, top + 16, colW, 'left', { list:true });
+    const b = clientBlock(L + colW + gap, top, colW);
+    label('Details', R, top, { align:'right' });
+    const c = metaBlock(R, top + 14, [[numLabel, docNo], ...dateRows], L + (colW + gap) * 2);
+    return Math.max(a, b, c);
+  }
+  // Classic: centred letterhead, no rules; Bill to | Details beneath the title
+  function headClassic(){
+    const cx = L + CW / 2;
+    let yy = TOP;
+    const mh = drawMark(cx, yy, 'center'); if (mh) yy += mh + 10;
+    yy = bizBlock(cx, yy, CW * 0.86, 'center', { nameSize:18, nameFont:'H', nameCs:0.6 });
+    yy += 20;
+    text(typeLabel.toUpperCase(), cx, baseline(yy, 20, 15), { f:'H', size:15, cs:3.4, align:'center' });
+    yy += 20;
+    text(docNo, cx, baseline(yy, 12, 8.6), { size:8.6, color:C.muted, align:'center' });
+    yy += 12 + 22;
+    const a = clientBlock(L, yy, CW * 0.55);
+    label('Details', R, yy, { align:'right' });
+    const b = metaBlock(R, yy + 14, dateRows);
+    return Math.max(a, b);
+  }
+  // Modern: accent rule, identity left | type + number + dates right; tinted Bill to panel
+  function headModern(){
+    rect(L, TOP, CW, 4, C.accent);
+    const rightW = 190, leftW = CW - rightW - 28, top = TOP + 22;
+    let ly = top;
+    const mh = drawMark(L, ly, 'left'); if (mh) ly += mh + 9;
+    ly = bizBlock(L, ly, leftW, 'left', { nameSize:17 });
+    let ry = top;
+    text(typeLabel.toUpperCase(), R, baseline(ry, 12, 7.4), { f:'HB', size:7.4, cs:2, color:C.accentText, align:'right' });
+    ry += 15;
+    const ns = fitSize(docNo, 'HB', 18, rightW, 10);
+    text(docNo, R, baseline(ry, ns * 1.2, ns), { f:'HB', size:ns, align:'right' });
+    ry += ns * 1.2 + 6;
+    ry = metaBlock(R, ry, dateRows);
+    const pTop = Math.max(ly, ry) + 20, pad = 14;
+    const start = ops.length;
+    const endL = clientBlock(L + pad + 3, pTop + pad, CW * 0.55);
+    const endR = amountSummary(R - pad, pTop + pad, CW * 0.36, false);
+    const end = Math.max(endL, endR);
+    ops.splice(start, 0,
+      { t:'rect', x:L, y:pTop, w:CW, h:end - pTop + pad, fill:C.panel },
+      { t:'rect', x:L, y:pTop, w:3, h:end - pTop + pad, fill:C.accent });
+    return end + pad;
+  }
+  // Editorial: serif title, fine rule; Bill to | Amount due
+  function headEditorial(){
+    const rightW = 200, leftW = CW - rightW - 28;
+    let ly = TOP;
+    const mh = drawMark(L, ly, 'left'); if (mh) ly += mh + 9;
+    ly = bizBlock(L, ly, leftW, 'left', { nameSize:19, nameFont:'TB' });
+    let ry = TOP;
+    const ts = fitSize(typeLabel, 'T', 28, rightW, 14);
+    text(typeLabel, R, baseline(ry, ts * 1.1, ts), { f:'T', size:ts, align:'right' });
+    ry += ts * 1.1 + 3;
+    text('No. ' + docNo, R, baseline(ry, 12, 8.6), { size:8.6, color:C.muted, align:'right' });
+    ry += 17;
+    ry = metaBlock(R, ry, dateRows);
+    const yy = Math.max(ly, ry) + 16;
+    rule(L, yy, R, C.ink, 0.7);
+    const a = clientBlock(L, yy + 18, CW * 0.55);
+    const b = amountSummary(R, yy + 18, CW * 0.36, true);
+    return Math.max(a, b);
+  }
+
+  // ---------- running header for pages 2+ (no addresses) ----------
+  function continuationPage(){
+    newPage();
+    text(bizName, L, baseline(TOP, 12, 9.5), { f:FB, size:9.5 });
+    text(typeLabel + ' ' + docNo + '  (continued)', R, baseline(TOP, 12, 8), { size:8, color:C.muted, align:'right' });
+    let yy = TOP + 17;
+    if (lined) rule(L, yy, R, C.hair, 0.6);
+    y = yy + 20;
+    freshPage = true;
+  }
+
+  // ---------- line-items table ----------
+  const PADX = style === 'editorial' ? 0 : 8;
+  const W_QTY = 40, W_UNIT = 50, W_RATE = 82, W_AMT = 90, W_DESC = CW - W_QTY - W_UNIT - W_RATE - W_AMT;
+  const xQtyR = L + W_DESC + W_QTY - 4;
+  const xUnit = L + W_DESC + W_QTY + 8;
+  const xRateR = L + W_DESC + W_QTY + W_UNIT + W_RATE - 8;
+  const xAmtR = R - PADX;
+  const items = (doc.items || []).filter(it => (it.description || '').trim() || (Number(it.rate) || 0) !== 0);
+  const LEVELS = [
+    { fs:9.5, sub:8.2, pad:8 },  { fs:9,   sub:7.9, pad:6.5 }, { fs:8.6, sub:7.5, pad:5.2 },
+    { fs:8.2, sub:7.2, pad:4.2 }, { fs:7.8, sub:6.9, pad:3.3 }, { fs:7.4, sub:6.6, pad:2.6 },
+    { fs:7,   sub:6.3, pad:2 }
+  ];
+  const headH = lv => Math.max(17, lv.pad * 2 + 11);
+  function rowModel(it, lv){
+    const raw = normText(it.description || '').split('\n');
+    const main = wrapLines(raw[0].trim() || '—', 'HB', lv.fs, W_DESC - PADX * 2);
+    const rest = raw.slice(1).join('\n').trim();
+    const sub = rest ? wrapLines(rest, 'H', lv.sub, W_DESC - PADX * 2) : [];
+    const lhM = lv.fs * 1.3, lhS = lv.sub * 1.36;
+    return { it, main, sub, lhM, lhS, h: lv.pad * 2 + main.length * lhM + (sub.length ? 2 + sub.length * lhS : 0) };
+  }
+  const tableHeight = lv => items.length ? headH(lv) + items.reduce((s, it) => s + rowModel(it, lv).h, 0) : headH(lv) + 40;
+  function drawTableHead(top, lv){
+    const hh = headH(lv), bl = baseline(top, hh, 6.8);
+    const col = style === 'modern' ? '#ffffff' : style === 'editorial' ? C.muted : C.ink;
+    if (style === 'modern') rect(L, top, CW, hh, C.ink);
+    const o = { f:'HB', size:6.8, cs:0.8, color:col };
+    text('DESCRIPTION', L + PADX, bl, o);
+    text('QTY', xQtyR, bl, Object.assign({}, o, { align:'right' }));
+    text('UNIT', xUnit, bl, o);
+    text('RATE (' + sym + ')', xRateR, bl, Object.assign({}, o, { align:'right' }));
+    text('AMOUNT (' + sym + ')', xAmtR, bl, Object.assign({}, o, { align:'right' }));
+    if (style === 'studio' || style === 'editorial') rule(L, top + hh, R, C.ink, 0.7);
+    return top + hh;
+  }
+  function drawRow(rm, top, idx, lv){
+    if ((style === 'studio' || style === 'classic') && idx % 2 === 1) rect(L, top, CW, rm.h, C.zebra);
+    let yy = top + lv.pad;
+    const firstBl = baseline(yy, rm.lhM, lv.fs);
+    rm.main.forEach((ln, i) => text(ln, L + PADX, baseline(yy + i * rm.lhM, rm.lhM, lv.fs), { f:'HB', size:lv.fs }));
+    yy += rm.main.length * rm.lhM;
+    if (rm.sub.length){ yy += 2; rm.sub.forEach((ln, i) => text(ln, L + PADX, baseline(yy + i * rm.lhS, rm.lhS, lv.sub), { size:lv.sub, color:C.muted })); }
+    const q = Number(rm.it.quantity) || 0, rate = Number(rm.it.rate) || 0;
+    const qs = normText(q.toLocaleString('en-US', { maximumFractionDigits:2 }));
+    const us = normText(rm.it.unit || '');
+    const rs = fmtNumber(rate), as = fmtNumber(q * rate);
+    text(qs, xQtyR, firstBl, { size:fitSize(qs, 'H', lv.fs, W_QTY - 6), align:'right' });
+    text(us, xUnit, firstBl, { size:fitSize(us, 'H', lv.fs, W_UNIT - 10), color:C.muted });
+    text(rs, xRateR, firstBl, { size:fitSize(rs, 'H', lv.fs, W_RATE - 14), align:'right' });
+    text(as, xAmtR, firstBl, { f:'HB', size:fitSize(as, 'HB', lv.fs, W_AMT - PADX - 6), align:'right' });
+    if (style === 'modern' || style === 'editorial') rule(L, top + rm.h, R, C.hair, 0.5);
+  }
+
+  // ---------- totals ----------
+  const totRows = [['Subtotal', money(t.subtotal)]];
+  if (t.discount > 0) totRows.push([doc.discount.type === 'percent' ? 'Discount (' + doc.discount.value + '%)' : 'Discount', '- ' + money(t.discount)]);
+  if (doc.vatOn) totRows.push(['VAT (' + (Number(doc.vatRate) || 0) + '%)', money(t.vat)]);
+  const TW = 240, TX = R - TW, GH = 30;
+  const totalsH = totRows.length * 17 + 8 + GH;
+  function drawTotals(top){
+    const inset = (style === 'modern' || style === 'studio') ? 12 : 0;
+    let yy = top;
+    totRows.forEach(([k, v]) => {
+      const bl = baseline(yy, 17, 8.8);
+      text(k, TX + inset, bl, { size:8.8, color:C.muted });
+      text(v, R - inset, bl, { size:8.8, align:'right' });
+      yy += 17;
+    });
+    yy += 8;
+    const amt = money(t.total);
+    if (style === 'modern' || style === 'studio'){
+      const fill = style === 'modern' ? C.ink : mixHex(C.accent, '#ffffff', 0.72);
+      const fg = onColor(fill);
+      rect(TX, yy, TW, GH, fill);
+      text(grandLabel, TX + inset, baseline(yy, GH, 10), { f:'HB', size:10, color:fg });
+      text(amt, R - inset, baseline(yy, GH, 12), { f:'HB', size:fitSize(amt, 'HB', 12, TW * 0.6), color:fg, align:'right' });
+    } else {
+      if (style === 'editorial') rule(TX, yy, R, C.ink, 0.7);
+      text(grandLabel, TX, baseline(yy, GH, 11), { f:FB, size:11 });
+      text(amt, R, baseline(yy, GH, 13), { f:FB, size:fitSize(amt, FB, 13, TW * 0.62), align:'right' });
+    }
+    return yy + GH;
+  }
+
+  // ---------- terms / questions / signature ----------
+  const notesText = normText(doc.notes || '').replace(/\n{3,}/g, '\n\n').trim();
+  const qBits = [B.email, B.phone].map(v => normText(v || '').trim()).filter(Boolean);
+  const qText = qBits.length ? 'Reach ' + (normText(B.contact || '').trim() || 'us') + ' at ' + qBits.join(' · ') + '.\nThank you for the work.' : '';
+  function drawNotes(){
+    const lw = CW * 0.58, rx = L + CW * 0.64, rw = R - rx, lh = 12.2, head = 17;
+    const nl = notesText ? wrapLines(notesText, 'H', 8.5, lw) : [];
+    const ql = qText ? wrapLines(qText, 'H', 8.5, rw) : [];
+    if (!nl.length && !ql.length) return;
+    const blockH = head + Math.max(nl.length, ql.length) * lh + (lined ? 16 : 0);
+    const freshRoom = BOTTOM - (TOP + 37);
+    if (y + 28 + blockH > BOTTOM){
+      if (blockH <= freshRoom) continuationPage();
+      else return drawNotesFlowing(nl, ql, lh);
+    }
+    if (!freshPage){ y += 28; if (lined){ rule(L, y, R, C.hair, 0.6); y += 16; } }
+    if (nl.length) label(isInvLike ? 'Payment terms & details' : 'Terms', L, y);
+    if (ql.length) label('Questions', rx, y);
+    para(nl, L, y + head, { size:8.5, lh });
+    para(ql, rx, y + head, { size:8.5, lh, color:C.muted });
+    y += head + Math.max(nl.length, ql.length) * lh;
+    freshPage = false;
+  }
+  function drawNotesFlowing(nl, ql, lh){        // very long terms: flow line by line across pages
+    const section = (title, lines, color) => {
+      if (!lines.length) return;
+      if (y + 17 + lh * 2 > BOTTOM) continuationPage(); else if (!freshPage) y += 24;
+      label(title, L, y); y += 17; freshPage = false;
+      lines.forEach(ln => {
+        if (y + lh > BOTTOM){ continuationPage(); freshPage = false; }
+        text(ln, L, baseline(y, lh, 8.5), { size:8.5, color }); y += lh;
+      });
+    };
+    section(isInvLike ? 'Payment terms & details' : 'Terms', nl, C.ink);
+    section('Questions', ql, C.muted);
+  }
+  const sigSrc = B.signature || null, sigInfo = docImage(sigSrc);
+  function drawSignature(){
+    if (!sigSrc || !sigInfo) return;
+    let h = 44, w = sigInfo.w * h / sigInfo.h;
+    if (w > 170){ w = 170; h = sigInfo.h * w / sigInfo.w; }
+    const need = 30 + h + 32;
+    if (y + need > BOTTOM) continuationPage(); else y += 30;
+    image(sigSrc, L, y, w, h); y += h + 5;
+    if (lined) rule(L, y, L + 180, C.ink, 0.6);
+    y += 5;
+    text(normText(B.contact || B.name || ''), L, baseline(y, 12, 8.5), { f:'HB', size:8.5 }); y += 12;
+    text('Authorized signature', L, baseline(y, 11, 7.4), { size:7.4, color:C.muted }); y += 11;
+    freshPage = false;
+  }
+
+  // ================= compose =================
+  newPage();
+  y = ({ studio:headStudio, classic:headClassic, modern:headModern, editorial:headEditorial })[style]();
+  y += 26;
+
+  // Choose the most generous row style that keeps every line item on page 1.
+  // Prefer keeping totals on page 1 too, but never shrink type below 8.6pt just for that.
+  const avail = BOTTOM - y;
+  let lv = null, totalsOnFirst = false;
+  for (let i = 0; i < 3 && !lv; i++) if (tableHeight(LEVELS[i]) + 16 + totalsH <= avail){ lv = LEVELS[i]; totalsOnFirst = true; }
+  if (!lv) for (const L2 of LEVELS) if (tableHeight(L2) <= avail){ lv = L2; break; }
+  let overflow = false;
+  if (!lv){ lv = LEVELS[1]; overflow = true; }   // can't fit even at 7pt: stay legible and continue
+
+  y = drawTableHead(y, lv);
+  if (!items.length){
+    text('No line items yet.', L + CW / 2, baseline(y + 8, 24, 9), { size:9, color:C.faint, align:'center' });
+    y += 40;
+  }
+  items.forEach((it, i) => {
+    const rm = rowModel(it, lv);
+    if (y + rm.h > BOTTOM){        // only reachable when items truly cannot fit on one page
+      continuationPage(); freshPage = false;
+      y = drawTableHead(y, lv);
+    }
+    drawRow(rm, y, i, lv);
+    y += rm.h;
+  });
+  if (overflow) warnings.push('Too many line items to fit on one page — the table continues on page 2.');
+
+  if (y + 16 + totalsH > BOTTOM) continuationPage(); else y += 16;
+  y = drawTotals(y); freshPage = false;
+  drawNotes();
+  drawSignature();
+
+  // ---------- page footers (inside the printable area) ----------
+  const ref = bizName + (docNo ? '   ·   ' + typeLabel + ' ' + docNo : '');
+  pages.forEach((p, i) => {
+    ops = p.ops;
+    const fy = PH - M;
+    if (lined) rule(L, fy - 15, R, C.hair, 0.5);
+    text(ref, L, fy - 3, { size:7, color:C.faint });
+    text('Page ' + (i + 1) + ' of ' + pages.length, R, fy - 3, { size:7, color:C.faint, align:'right' });
+  });
+
+  return { W:PW, H:PH, pages, warnings, sizeKey, title: normText(typeLabel + ' ' + docNo), level: LEVELS.indexOf(lv) };
+}
+
+// ============================================================
+// BACK-END 1: SVG (preview + print)
+// ============================================================
+const f2 = n => String(Math.round(n * 100) / 100);
+const escXml = s => String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+function leftX(o){
+  const w = textW(o.s, o.f, o.size, o.cs);
+  return o.align === 'right' ? o.x - w : o.align === 'center' ? o.x - w / 2 : o.x;
+}
+function pageSVG(model, pg){
+  const out = [`<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 ${f2(model.W)} ${f2(model.H)}" preserveAspectRatio="xMidYMid meet"><rect width="100%" height="100%" fill="#ffffff"/>`];
+  for (const o of pg.ops){
+    if (o.t === 'rect') out.push(`<rect x="${f2(o.x)}" y="${f2(o.y)}" width="${f2(o.w)}" height="${f2(o.h)}" fill="${o.fill}"/>`);
+    else if (o.t === 'line') out.push(`<line x1="${f2(o.x1)}" y1="${f2(o.y1)}" x2="${f2(o.x2)}" y2="${f2(o.y2)}" stroke="${o.color}" stroke-width="${o.w}"/>`);
+    else if (o.t === 'circle') out.push(`<circle cx="${f2(o.cx)}" cy="${f2(o.cy)}" r="${f2(o.r)}" fill="${o.fill || 'none'}"${o.stroke ? ` stroke="${o.stroke}" stroke-width="${o.w || 1}"` : ''}/>`);
+    else if (o.t === 'img') out.push(`<image href="${escXml(o.src)}" xlink:href="${escXml(o.src)}" x="${f2(o.x)}" y="${f2(o.y)}" width="${f2(o.w)}" height="${f2(o.h)}" preserveAspectRatio="none"/>`);
+    else if (o.t === 'text'){
+      const fam = (o.f === 'T' || o.f === 'TB') ? FONT_CSS.T : FONT_CSS.H;
+      const wt = (o.f === 'HB' || o.f === 'TB') ? 700 : 400;
+      let xs, anchor = 'start';
+      if (o.cs){                                   // letter-spaced: place each glyph exactly
+        let cx = leftX(o); const arr = [];
+        for (const ch of o.s){ arr.push(f2(cx)); cx += (FONT_METRICS[o.f][winCode(ch) - 32] || 0) * o.size / 1000 + o.cs; }
+        xs = arr.join(' ');
+      } else {
+        xs = f2(o.x);
+        anchor = o.align === 'right' ? 'end' : o.align === 'center' ? 'middle' : 'start';
+      }
+      out.push(`<text x="${xs}" y="${f2(o.y)}" font-family="${escXml(fam)}" font-size="${o.size}" font-weight="${wt}" fill="${o.color}" text-anchor="${anchor}" xml:space="preserve">${escXml(o.s)}</text>`);
+    }
+  }
+  out.push('</svg>');
+  return out.join('');
+}
+
+function renderDocPreview(){
+  const el = document.getElementById('document');
+  if (!el || !current) return;
+  const model = layoutDocument(current);
+  const note = model.warnings.length ? `<div class="doc-fit-note">${escXml(model.warnings[0])}</div>` : '';
+  el.innerHTML = note + model.pages.map(pg =>
+    `<div class="doc-page" style="aspect-ratio:${f2(model.W)} / ${f2(model.H)}">${pageSVG(model, pg)}</div>`).join('');
+  const info = document.getElementById('docPageInfo');
+  if (info) info.textContent = (model.sizeKey === 'a4' ? 'A4' : 'US Letter') + ' · ' + model.pages.length + (model.pages.length === 1 ? ' page' : ' pages');
+  // Print uses the same pages; keep the printer's page size in step with the setting.
+  let ps = document.getElementById('docPrintPageStyle');
+  if (!ps){ ps = document.createElement('style'); ps.id = 'docPrintPageStyle'; document.head.appendChild(ps); }
+  if (!document.body.classList.contains('print-insights')){
+    ps.textContent = model.sizeKey === 'a4'
+      ? '@media print{@page{size:A4 portrait;margin:0}.doc-page{width:210mm!important;height:297mm!important}}'
+      : '@media print{@page{size:letter portrait;margin:0}.doc-page{width:8.5in!important;height:11in!important}}';
+  }
+}
+
+// ============================================================
+// BACK-END 2: native PDF writer (text stays text)
+// ============================================================
+const pdfNum = n => String(Math.round(n * 100) / 100);
+function pdfColor(hex, op){ const [r,g,b] = hexRgb(hex); return `${pdfNum(r / 255)} ${pdfNum(g / 255)} ${pdfNum(b / 255)} ${op}`; }
+function pdfStr(s){
+  let out = '(';
+  for (const ch of s){
+    const c = winCode(ch);
+    if (c === 40 || c === 41 || c === 92) out += '\\' + String.fromCharCode(c);
+    else if (c < 32 || c > 126) out += '\\' + c.toString(8).padStart(3, '0');
+    else out += String.fromCharCode(c);
+  }
+  return out + ')';
+}
+async function jpegFromDataUrl(src, bg){
+  const im = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
+  const k = Math.min(1, 1800 / Math.max(im.naturalWidth || 1, im.naturalHeight || 1));
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round((im.naturalWidth || 1) * k));
+  c.height = Math.max(1, Math.round((im.naturalHeight || 1) * k));
+  const x = c.getContext('2d');
+  x.fillStyle = bg || '#ffffff'; x.fillRect(0, 0, c.width, c.height);   // flatten transparency onto the colour behind it
+  x.drawImage(im, 0, 0, c.width, c.height);
+  const bin = atob(c.toDataURL('image/jpeg', 0.92).split(',')[1]);
+  const u = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+  return { bytes:u, w:c.width, h:c.height };
+}
+async function buildPdfBytes(model){
+  const imgKey = o => o.src + '|' + (o.bg || '#ffffff');
+  const srcs = [...new Set(model.pages.flatMap(p => p.ops.filter(o => o.t === 'img').map(imgKey)))];
+  const imgs = {};
+  for (const s of srcs){ const cut = s.lastIndexOf('|'); try { imgs[s] = await jpegFromDataUrl(s.slice(0, cut), s.slice(cut + 1)); } catch (e){ console.warn('image skipped', e); } }
+
+  const enc = s => { const a = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) a[i] = s.charCodeAt(i) & 255; return a; };
+  const parts = []; let len = 0; const offs = [];
+  const put = d => { const b = typeof d === 'string' ? enc(d) : d; parts.push(b); len += b.length; };
+  const obj = (n, body) => { offs[n] = len; put(n + ' 0 obj\n'); [].concat(body).forEach(put); put('\nendobj\n'); };
+
+  put('%PDF-1.4\n%\u00e2\u00e3\u00cf\u00d3\n');
+  const fontKeys = ['H', 'HB', 'T', 'TB'];
+  let n = 3;
+  const fontObj = {}; fontKeys.forEach(k => { fontObj[k] = n++; });
+  const imgObj = {}, imgName = {};
+  srcs.forEach((s, i) => { if (imgs[s]){ imgObj[s] = n++; imgName[s] = 'Im' + (i + 1); } });
+  const pageObjs = model.pages.map(() => ({ page:n++, content:n++ }));
+  const infoObj = n++;
+
+  obj(1, '<< /Type /Catalog /Pages 2 0 R >>');
+  obj(2, `<< /Type /Pages /Count ${model.pages.length} /Kids [${pageObjs.map(p => p.page + ' 0 R').join(' ')}] >>`);
+  fontKeys.forEach(k => obj(fontObj[k], `<< /Type /Font /Subtype /Type1 /BaseFont /${FONT_PS[k]} /Encoding /WinAnsiEncoding >>`));
+  srcs.forEach(s => {
+    if (!imgs[s]) return;
+    const im = imgs[s];
+    obj(imgObj[s], [`<< /Type /XObject /Subtype /Image /Width ${im.w} /Height ${im.h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${im.bytes.length} >>\nstream\n`, im.bytes, '\nendstream']);
+  });
+  const fontRes = fontKeys.map(k => `/${k} ${fontObj[k]} 0 R`).join(' ');
+  const xoRes = srcs.filter(s => imgs[s]).map(s => `/${imgName[s]} ${imgObj[s]} 0 R`).join(' ');
+  const H = model.H;
+  model.pages.forEach((pg, i) => {
+    const c = [];
+    for (const o of pg.ops){
+      if (o.t === 'rect') c.push(`${pdfColor(o.fill, 'rg')} ${pdfNum(o.x)} ${pdfNum(H - o.y - o.h)} ${pdfNum(o.w)} ${pdfNum(o.h)} re f`);
+      else if (o.t === 'line') c.push(`${pdfNum(o.w)} w ${pdfColor(o.color, 'RG')} ${pdfNum(o.x1)} ${pdfNum(H - o.y1)} m ${pdfNum(o.x2)} ${pdfNum(H - o.y2)} l S`);
+      else if (o.t === 'circle'){
+        const r = o.r, k = 0.5523 * r, cx = o.cx, cy = H - o.cy, p = pdfNum;
+        const path = `${p(cx + r)} ${p(cy)} m ${p(cx + r)} ${p(cy + k)} ${p(cx + k)} ${p(cy + r)} ${p(cx)} ${p(cy + r)} c ${p(cx - k)} ${p(cy + r)} ${p(cx - r)} ${p(cy + k)} ${p(cx - r)} ${p(cy)} c ${p(cx - r)} ${p(cy - k)} ${p(cx - k)} ${p(cy - r)} ${p(cx)} ${p(cy - r)} c ${p(cx + k)} ${p(cy - r)} ${p(cx + r)} ${p(cy - k)} ${p(cx + r)} ${p(cy)} c h`;
+        if (o.fill) c.push(`${pdfColor(o.fill, 'rg')} ${path} f`);
+        if (o.stroke) c.push(`${pdfNum(o.w || 1)} w ${pdfColor(o.stroke, 'RG')} ${path} S`);
+      }
+      else if (o.t === 'img' && imgs[imgKey(o)]) c.push(`q ${pdfNum(o.w)} 0 0 ${pdfNum(o.h)} ${pdfNum(o.x)} ${pdfNum(H - o.y - o.h)} cm /${imgName[imgKey(o)]} Do Q`);
+      else if (o.t === 'text') c.push(`BT /${o.f} ${pdfNum(o.size)} Tf ${pdfNum(o.cs || 0)} Tc ${pdfColor(o.color, 'rg')} ${pdfNum(leftX(o))} ${pdfNum(H - o.y)} Td ${pdfStr(o.s)} Tj ET`);
+    }
+    const stream = c.join('\n');
+    obj(pageObjs[i].page, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pdfNum(model.W)} ${pdfNum(model.H)}] /Resources << /Font << ${fontRes} >>${xoRes ? ` /XObject << ${xoRes} >>` : ''} >> /Contents ${pageObjs[i].content} 0 R >>`);
+    obj(pageObjs[i].content, [`<< /Length ${stream.length} >>\nstream\n`, stream, '\nendstream']);
+  });
+  const d = new Date(), z = v => String(v).padStart(2, '0');
+  const stamp = `${d.getFullYear()}${z(d.getMonth() + 1)}${z(d.getDate())}${z(d.getHours())}${z(d.getMinutes())}${z(d.getSeconds())}`;
+  obj(infoObj, `<< /Title ${pdfStr(model.title)} /Author ${pdfStr(normText(state.business.name || ''))} /Producer (InvoYou) /Creator (InvoYou) /CreationDate (D:${stamp}) >>`);
+
+  const xref = len;
+  put(`xref\n0 ${n}\n0000000000 65535 f \n`);
+  for (let i = 1; i < n; i++) put(String(offs[i]).padStart(10, '0') + ' 00000 n \n');
+  put(`trailer\n<< /Size ${n} /Root 1 0 R /Info ${infoObj} 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
+  const out = new Uint8Array(len); let p = 0;
+  parts.forEach(b => { out.set(b, p); p += b.length; });
+  return out;
+}
+
+// Export: same layout as the preview, written as a native PDF.
+async function exportPDF(){
+  if (!current){ toast('Open a document first'); return; }
+  const btn = document.getElementById('exportPdfBtn');
+  if (btn) btn.disabled = true;
+  try {
+    await waitForDocImages([state.business.logo, state.business.signature]);
+    const model = layoutDocument(current);
+    const bytes = await buildPdfBytes(model);
+    const url = URL.createObjectURL(new Blob([bytes], { type:'application/pdf' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = (current.number || 'document') + '.pdf';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+    toast(model.warnings.length ? model.warnings[0] : 'PDF downloaded');
   } catch (e){
     console.error('PDF export failed:', e);
-    if (!silent) toast('PDF export failed: ' + (e.message || e));
-    return null;
+    toast('PDF export failed: ' + (e.message || e));
   } finally {
-    if (renderHost.parentNode) document.body.removeChild(renderHost);
-    if (exportBtnEl && !silent){
-      exportBtnEl.disabled = false;
-      exportBtnEl.textContent = origExportText;
-    }
-    if (printBtnEl && !silent) printBtnEl.disabled = false;
+    if (btn) btn.disabled = false;
   }
 }
 
@@ -4777,27 +5053,21 @@ document.addEventListener('click', (e) => {
 });
 
 // -------- PDF + Email-to-self for Insights --------
-async function downloadInsightsPDF(){
-  if (typeof html2pdf === 'undefined'){
-    toast('PDF library still loading — try again in a moment.');
-    return;
-  }
+// Insights → one Letter/A4 page via the browser's own print-to-PDF.
+// (The old html2pdf path was removed with the image exporter.)
+function downloadInsightsPDF(){
   const el = document.getElementById('insightsContent');
   if (!el) return;
-  toast('Building PDF…');
-  const filename = `InvoYou-insights-${new Date().toISOString().slice(0,10)}.pdf`;
-  try {
-    await html2pdf().set({
-      margin:       [10, 8, 10, 8],
-      filename,
-      html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#FFFFFF' },
-      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak:    { mode: ['css', 'legacy'] }
-    }).from(el).save();
-  } catch(e){
-    console.warn('PDF error', e);
-    toast('PDF failed — try print → save as PDF instead.');
-  }
+  const a4 = state.settings && state.settings.pageSize === 'a4';
+  let ps = document.getElementById('docPrintPageStyle');
+  if (!ps){ ps = document.createElement('style'); ps.id = 'docPrintPageStyle'; document.head.appendChild(ps); }
+  const prev = ps.textContent;
+  ps.textContent = '@media print{@page{size:' + (a4 ? 'A4' : 'letter') + ' portrait;margin:0.5in}}';
+  document.body.classList.add('print-insights');
+  const done = () => { document.body.classList.remove('print-insights'); ps.textContent = prev; window.removeEventListener('afterprint', done); };
+  window.addEventListener('afterprint', done);
+  toast('Choose “Save as PDF” in the print dialog');
+  setTimeout(() => { window.print(); setTimeout(done, 1500); }, 60);
 }
 
 function emailInsightsToSelf(){
